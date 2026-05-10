@@ -15,32 +15,43 @@ export function ChartRenderer({ render, content, sessionId, msgId }: Props) {
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const placeholderRef = useRef<HTMLDivElement>(null);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (render !== "image-placeholder" || !sessionId || !msgId) return;
-    if (imgSrc || loadError) return;
+    if (render !== "image-placeholder" || !sessionId || msgId === undefined) return;
+    if (fetchedRef.current) return;
 
     const el = placeholderRef.current;
     if (!el) return;
 
+    const controller = new AbortController();
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
+          fetchedRef.current = true;
           observer.disconnect();
-          fetch(`${API_BASE}/sessions/${sessionId}/messages/${msgId}/image`)
+          fetch(`${API_BASE}/sessions/${sessionId}/messages/${msgId}/image`, {
+            signal: controller.signal,
+          })
             .then((r) => {
               if (!r.ok) throw new Error("not found");
               return r.json();
             })
             .then((data) => setImgSrc(`data:image/png;base64,${data.image_data}`))
-            .catch(() => setLoadError(true));
+            .catch((err) => {
+              if (err.name !== "AbortError") setLoadError(true);
+            });
         }
       },
       { threshold: 0.1 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [render, sessionId, msgId, imgSrc, loadError]);
+    return () => {
+      observer.disconnect();
+      controller.abort();
+    };
+  }, [render, sessionId, msgId]);
 
   if (render === "image") {
     return (
