@@ -32,7 +32,7 @@ def _build_llm() -> ChatOpenAI:
         base_url=cfg["base_url"],
         api_key=cfg["api_key"],
         model=cfg["model"],
-        temperature=0.0,
+        temperature=0.0,  # deterministic routing: same input must always produce same intent
     )
 
 
@@ -52,9 +52,12 @@ def run_intent_router(user_message: str, conversation_history: list, llm=None) -
     logger.debug("intent_router: raw response %r", response.content[:200])
     try:
         result = json.loads(response.content)
-        assert result.get("intent") in ("data_analysis", "knowledge_qa", "chitchat", "unknown")
-        assert isinstance(result.get("rewritten_query"), str)
-        assert isinstance(result.get("confidence"), (int, float))
+        if result.get("intent") not in ("data_analysis", "knowledge_qa", "chitchat", "unknown"):
+            raise ValueError(f"invalid intent: {result.get('intent')!r}")
+        if not isinstance(result.get("rewritten_query"), str):
+            raise ValueError("rewritten_query is not a string")
+        if not isinstance(result.get("confidence"), (int, float)):
+            raise ValueError("confidence is not a number")
         logger.info("intent_router: intent=%s  confidence=%.2f  rewritten=%r",
                     result["intent"], result["confidence"], result["rewritten_query"][:60])
         return result

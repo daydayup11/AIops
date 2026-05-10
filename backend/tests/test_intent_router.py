@@ -43,7 +43,7 @@ def test_routes_chitchat():
     assert result["intent"] == "chitchat"
 
 
-def test_unknown_falls_back_to_data_analysis():
+def test_unknown_intent_passes_through():
     from agents.intent_router import run_intent_router
 
     class FakeLLM:
