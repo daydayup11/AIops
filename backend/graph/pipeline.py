@@ -1,4 +1,5 @@
 import logging
+import concurrent.futures
 import time
 from typing import Callable, Optional
 from typing_extensions import TypedDict
@@ -99,6 +100,20 @@ def node_planner(state: PipelineState) -> dict:
     }
 
 
+_HEARTBEAT_INTERVAL = 10  # seconds between progress heartbeats during LLM calls
+
+
+def _run_with_heartbeat(fn, emit_fn, heartbeat_msg: str, heartbeat_interval: int = _HEARTBEAT_INTERVAL):
+    """Run fn() in a thread while emitting heartbeat progress on the main thread."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn)
+        while True:
+            try:
+                return future.result(timeout=heartbeat_interval)
+            except concurrent.futures.TimeoutError:
+                emit_fn(heartbeat_msg)
+
+
 def node_sql_engineer(state: PipelineState) -> dict:
     sid = state["session_id"]
     retry = state.get("script_retry_count", 0)
@@ -111,7 +126,11 @@ def node_sql_engineer(state: PipelineState) -> dict:
     logger.info("[%s] >>> node:sql_engineer  retry=%d", sid, retry)
     start = time.perf_counter()
     try:
-        py_script = run_sql_engineer(state["task_plan"], issues=issues)
+        py_script = _run_with_heartbeat(
+            lambda: run_sql_engineer(state["task_plan"], issues=issues),
+            lambda msg: _emit(state, msg),
+            "⏳ 脚本生成中，请稍候...",
+        )
     except Exception as e:
         elapsed = time.perf_counter() - start
         logger.error("[%s] <<< node:sql_engineer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
@@ -140,8 +159,13 @@ def node_code_reviewer(state: PipelineState) -> dict:
     _emit(state, "🔍 正在审查脚本安全性与性能...")
     logger.info("[%s] >>> node:code_reviewer", sid)
     start = time.perf_counter()
+    script_code = state["py_script"].script_code
     try:
-        result = run_code_reviewer(state["py_script"].script_code)
+        result = _run_with_heartbeat(
+            lambda: run_code_reviewer(script_code),
+            lambda msg: _emit(state, msg),
+            "⏳ 代码审查中，请稍候...",
+        )
     except Exception as e:
         elapsed = time.perf_counter() - start
         logger.error("[%s] <<< node:code_reviewer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
