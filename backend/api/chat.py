@@ -135,7 +135,7 @@ async def websocket_chat(ws: WebSocket):
                 render = output["render"]
                 content = output["content"]
                 if render == "image":
-                    save_message(session_id, "assistant", "image", content[:100] + "...")
+                    save_message(session_id, "assistant", "image", "[图表]", image_data=content)
                     await _send(ws, {"type": "result", "render": "image", "content": content})
                     logger.info("[%s] sent output[%d] image  b64_len=%d", session_id, i, len(content))
                 else:
