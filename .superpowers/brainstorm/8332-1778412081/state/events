@@ -1,0 +1,1 @@
+{"type":"click","text":"B\n    \n      后端进程内执行 + 沙箱（推荐）\n      脚本用 subprocess 在独立进程中运行，通过环境变量传入 ClickHouse 连接参数，输出图片到 data/renders/。后端通过 HTTP 或文件路径将图片 base64 推给前端。\n      \n        优点进程隔离，崩溃不影响主服务超时控制容易实现无需额外服务依然简单，改动量最小\n        缺点LLM 生成脚本仍可做危险操作（需 prompt 约束）每次查询都需要新建 CH 连接","choice":"b","id":null,"timestamp":1778412166246}

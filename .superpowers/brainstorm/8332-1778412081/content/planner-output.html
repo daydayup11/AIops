@@ -1,0 +1,28 @@
+<h2>Planner 输出什么给 sql_engineer？</h2>
+<p class="subtitle">Planner 专注方案设计后，它的输出结构怎么变？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>保留现有 SubTask 结构，去掉 viz_blueprint（推荐）</h3>
+      <p>Planner 仍输出 <code>tasks[]</code>（id、description、tables、time_range_hours），不再输出 viz_blueprint。sql_engineer 收到每个 SubTask 后，自主决定用什么图表和字段。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>改动范围最小，现有 pipeline 结构基本不变</li><li>sql_engineer 的 prompt 可以包含完整的"查询+可视化"语境</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>sql_engineer 要自己判断图表类型，prompt 变复杂</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>新增 viz_intent 字段：只描述"想看什么"，不指定字段名</h3>
+      <p>Planner 在每个 task 里加一个 <code>viz_intent</code>（如："展示各 IP 的外发流量排名，突出异常值"），sql_engineer 根据意图自由决定图表类型和 SQL 字段。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>Planner 只表达意图，不猜列名——这是之前出错的根源</li><li>sql_engineer 拿到意图后可以更灵活生成脚本</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要修改 SubTask schema 增加字段</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

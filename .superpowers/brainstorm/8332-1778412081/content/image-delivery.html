@@ -1,0 +1,28 @@
+<h2>图片如何传给前端？</h2>
+<p class="subtitle">脚本生成图片后，前端怎么拿到它？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Base64 内嵌在 WebSocket 消息里（推荐）</h3>
+      <p>后端读取图片文件，base64 编码后直接塞进 WebSocket JSON 消息，前端用 <code>&lt;img src="data:image/png;base64,..."&gt;</code> 展示。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>无需新增 HTTP 路由</li><li>与现有 WebSocket 协议完全一致</li><li>前端逻辑改动最小（新增一种 render 类型）</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>大图会撑大 WS 消息（通常 <200KB，可接受）</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>静态文件 URL</h3>
+      <p>FastAPI 挂载 <code>/renders</code> 静态目录，脚本保存图片后，后端推送 URL，前端用 <code>&lt;img src="/renders/..."&gt;</code> 加载。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>WS 消息轻量</li><li>图片可缓存</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要新增静态路由</li><li>跨域/路径问题在前端需处理</li><li>图片文件需要生命周期管理（清理）</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

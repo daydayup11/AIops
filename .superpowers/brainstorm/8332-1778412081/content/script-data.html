@@ -1,0 +1,28 @@
+<h2>Python 脚本怎么拿到数据？</h2>
+<p class="subtitle">脚本需要查询 ClickHouse，数据从哪里来？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>脚本自己连 ClickHouse 执行 SQL（推荐）</h3>
+      <p>Planner 生成的脚本包含完整的 SQL 查询逻辑，通过环境变量拿到连接参数后自行查询，再用 matplotlib/seaborn 等库生成图片。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>脚本自包含，逻辑完整</li><li>LLM 可以在脚本里自由处理数据（过滤、聚合、pivot）</li><li>不需要中间数据传递</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>SQL engineer 节点变成可选或合并进 planner</li><li>脚本要处理连接异常</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>executor 先跑 SQL，把 DataFrame 序列化传给脚本</h3>
+      <p>保留现有的 sql_engineer → executor 流程，executor 把查询结果以 CSV/JSON 文件形式写到临时目录，脚本读取文件做可视化。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>保留现有 SQL 执行链路，改动更小</li><li>脚本只做可视化，职责单一</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>多一次数据序列化/反序列化</li><li>脚本能做的数据处理受限（只能处理已查出来的数据）</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

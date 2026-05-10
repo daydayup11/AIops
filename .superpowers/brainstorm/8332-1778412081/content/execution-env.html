@@ -1,0 +1,40 @@
+<h2>Python 脚本在哪里执行？</h2>
+<p class="subtitle">Planner 生成的分析脚本需要一个执行环境，这决定了整体架构</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>后端进程内执行（subprocess / exec）</h3>
+      <p>脚本由 FastAPI 后端直接用 <code>subprocess</code> 或 <code>exec()</code> 运行，生成图片文件后通过 WebSocket 把路径/base64 推给前端。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>无需新组件，架构最简</li><li>可直接访问 ClickHouse 连接池</li><li>延迟低</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>exec() 有安全风险（LLM 生成代码）</li><li>subprocess 有沙箱但需要额外隔离</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>后端进程内执行 + 沙箱（推荐）</h3>
+      <p>脚本用 <code>subprocess</code> 在独立进程中运行，通过环境变量传入 ClickHouse 连接参数，输出图片到 <code>data/renders/</code>。后端通过 HTTP 或文件路径将图片 base64 推给前端。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>进程隔离，崩溃不影响主服务</li><li>超时控制容易实现</li><li>无需额外服务</li><li>依然简单，改动量最小</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>LLM 生成脚本仍可做危险操作（需 prompt 约束）</li><li>每次查询都需要新建 CH 连接</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Jupyter / 独立 Python 服务</h3>
+      <p>单独起一个 Python kernel 服务（如 Jupyter kernel 或自定义 gRPC 服务），复用 session 状态，脚本在 kernel 中执行并返回图片。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>可复用数据（DataFrame 缓存）</li><li>更强的沙箱（可用 seccomp/nsjail）</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>新增一个需要维护的服务</li><li>复杂度大幅增加</li><li>对当前场景过度设计</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
