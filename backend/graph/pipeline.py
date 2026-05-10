@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Any, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
@@ -7,6 +9,8 @@ from agents.planner import run_planner
 from agents.sql_engineer import run_sql_engineer
 from agents.visualizer import run_visualizer
 from executor.parallel import ParallelExecutor
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineState(TypedDict):
@@ -24,7 +28,10 @@ class PipelineState(TypedDict):
 
 
 def node_planner(state: PipelineState) -> dict:
+    logger.debug("Entering node: planner")
+    start = time.perf_counter()
     plan = run_planner(state["user_message"], state["conversation_history"])
+    logger.debug("Exiting node: planner (%.2fs)", time.perf_counter() - start)
     return {
         "task_plan": plan,
         "clarification_needed": plan.clarification_needed,
@@ -33,23 +40,32 @@ def node_planner(state: PipelineState) -> dict:
 
 
 def node_sql_engineer(state: PipelineState) -> dict:
+    logger.debug("Entering node: sql_engineer")
+    start = time.perf_counter()
     sql_tasks = run_sql_engineer(state["task_plan"].tasks)
+    logger.debug("Exiting node: sql_engineer (%.2fs)", time.perf_counter() - start)
     return {"sql_tasks": sql_tasks}
 
 
 def node_executor(state: PipelineState) -> dict:
+    logger.debug("Entering node: executor")
+    start = time.perf_counter()
     executor = ParallelExecutor()
     results = executor.run(state["sql_tasks"], progress_cb=state.get("progress_cb"))
+    logger.debug("Exiting node: executor (%.2fs)", time.perf_counter() - start)
     return {"execution_results": results}
 
 
 def node_visualizer(state: PipelineState) -> dict:
     import uuid
+    logger.debug("Entering node: visualizer")
+    start = time.perf_counter()
     outputs = run_visualizer(
         state["execution_results"],
         session_id=state["session_id"],
         message_id=str(uuid.uuid4()),
     )
+    logger.debug("Exiting node: visualizer (%.2fs)", time.perf_counter() - start)
     return {"viz_outputs": outputs}
 
 
