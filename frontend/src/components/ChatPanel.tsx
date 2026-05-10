@@ -8,9 +8,10 @@ import { SummaryReport } from "./SummaryReport";
 interface Props {
   messages: ChatMessage[];
   onSend: (text: string) => void;
+  sessionId: string;
 }
 
-export function ChatPanel({ messages, onSend }: Props) {
+export function ChatPanel({ messages, onSend, sessionId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,7 +49,12 @@ export function ChatPanel({ messages, onSend }: Props) {
               key={msg.id}
               className="w-full bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-5 shadow-md"
             >
-              <ChartRenderer render={msg.render!} content={msg.content} />
+              <ChartRenderer
+                render={msg.render!}
+                content={msg.content}
+                sessionId={sessionId}
+                msgId={msg.msg_id}
+              />
             </div>
           );
         }
