@@ -1,7 +1,7 @@
 import ReactECharts from "echarts-for-react";
 
 interface Props {
-  render: "echarts" | "html" | "text";
+  render: "echarts" | "html" | "table" | "text";
   content: any;
   insight?: string;
 }

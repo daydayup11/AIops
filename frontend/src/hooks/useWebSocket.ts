@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChatMessage, WSMessage } from "../types";
+import type { ChatMessage, WSMessage } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 const WS_URL = "ws://localhost:8000/api/v1/chat";
