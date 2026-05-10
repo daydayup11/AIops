@@ -69,6 +69,7 @@ def test_script_runner_script_error_returns_error():
     outputs = run_script_runner(script)
     assert len(outputs) == 1
     assert outputs[0]["render"] == "text"
+    assert "boom" in outputs[0]["content"]
 
 
 def test_script_runner_no_output_returns_error():
