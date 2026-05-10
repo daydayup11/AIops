@@ -1,24 +1,31 @@
 import json
 import logging
 import time
+from typing import Optional
 from langchain_openai import ChatOpenAI
-from models.schemas import SummaryReport
+from models.schemas import SummaryReport, AnalysisPlan
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """你是数据分析报告专家。根据用户的原始问题和各图表的洞察，生成一份结构化分析报告。
+_SYSTEM_PROMPT = """你是数据分析报告专家。你会收到：
+1. 用户的原始问题
+2. 分析方案（规划阶段制定的目标、思路、预期发现）
+3. 各查询任务的实际数据结果摘要
+
+你的任务是：对照分析方案，结合实际数据，生成一份有深度的分析报告。
 
 返回严格JSON（不要Markdown代码块）：
 {
   "title": "报告标题（10字以内）",
   "key_points": ["要点1", "要点2", "要点3"],
-  "conclusion": "针对用户问题的结论段落（2-3句话，直接回答用户问题）"
+  "conclusion": "结论段落（3-4句话：先直接回答用户问题，再说明数据依据，最后给出行动建议）"
 }
 
 规则：
-- key_points 3-5条，每条一句话，聚焦数据发现
-- conclusion 必须直接回答用户的原始问题
+- key_points 3-5条，每条一句话，需对照预期发现说明是否验证、有何差异
+- conclusion 必须直接回答用户问题，并给出可操作的建议
+- 若某个分析维度数据为空或查询失败，需在报告中说明该维度未能覆盖
 - 使用中文
 """
 
@@ -33,13 +40,45 @@ def _build_llm() -> ChatOpenAI:
     )
 
 
-def run_summarizer(user_message: str, insights: list, llm=None) -> SummaryReport:
+def _format_insight(index: int, item: dict) -> str:
+    hint = item.get("insight_hint", "")
+    # New script-based pipeline: item has "charts" (number of images produced)
+    if "charts" in item:
+        charts = item["charts"]
+        status = f"已生成 {charts} 张图表" if charts > 0 else "脚本执行完成但未生成图表"
+        return f"- 分析{index + 1}：{hint}，{status}"
+    # Legacy row-based pipeline: item has "rows"
+    rows = item.get("rows", 0)
+    status = f"有效数据 {rows} 行" if rows > 0 else "无数据或查询失败"
+    return f"- 维度{index + 1}（{item.get('task_id', '')}）：{hint}，{status}"
+
+
+def run_summarizer(
+    user_message: str,
+    insights: list,
+    analysis_plan: Optional[AnalysisPlan] = None,
+    llm=None,
+) -> SummaryReport:
     llm = llm or _build_llm()
+
+    plan_text = ""
+    if analysis_plan:
+        dims = "、".join(analysis_plan.analysis_dimensions)
+        findings = "\n".join(f"  - {f}" for f in analysis_plan.expected_findings)
+        plan_text = f"""
+分析方案：
+- 目标：{analysis_plan.goal}
+- 思路：{analysis_plan.approach}
+- 分析维度：{dims}
+- 预期发现：
+{findings}
+"""
+
     insights_text = "\n".join(
-        f"- 图表{i+1}（{item.get('task_id','')}）：{item.get('insight_hint','')}，数据行数={item.get('rows',0)}"
-        for i, item in enumerate(insights)
+        _format_insight(i, item) for i, item in enumerate(insights)
     )
-    user_content = f"用户问题：{user_message}\n\n各图表洞察：\n{insights_text}"
+
+    user_content = f"用户问题：{user_message}\n{plan_text}\n实际查询结果：\n{insights_text}"
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": user_content},

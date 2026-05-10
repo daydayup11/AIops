@@ -211,7 +211,7 @@ def node_summarizer(state: PipelineState) -> dict:
     analysis_plan = task_plan.analysis_plan if task_plan else None
     try:
         image_count = sum(1 for o in state.get("viz_outputs", []) if o.get("render") == "image")
-        insights = [{"task_id": "script", "insight_hint": analysis_plan.viz_intent if analysis_plan else "", "rows": image_count}]
+        insights = [{"task_id": "script", "insight_hint": analysis_plan.viz_intent if analysis_plan else "", "charts": image_count}]
         report = run_summarizer(state["user_message"], insights, analysis_plan=analysis_plan)
     except Exception as e:
         elapsed = time.perf_counter() - start
