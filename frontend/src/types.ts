@@ -1,5 +1,5 @@
 export type MessageType = "clarify" | "progress" | "result" | "plan" | "summary" | "error" | "done" | "user";
-export type RenderType = "image" | "text";
+export type RenderType = "image" | "text" | "image-placeholder";
 
 export interface WSMessage {
   type: MessageType;
@@ -21,6 +21,7 @@ export interface ChatMessage {
   timestamp: number;
   question?: string;
   options?: string[];
+  msg_id?: number;  // for history image lazy-loading
 }
 
 export interface SummaryReportData {
