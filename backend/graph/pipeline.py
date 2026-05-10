@@ -134,11 +134,12 @@ def node_chitchat_agent(state: PipelineState) -> dict:
 
 def node_planner(state: PipelineState) -> dict:
     sid = state["session_id"]
+    query = state.get("rewritten_query") or state["user_message"]
     _emit(state, "🧠 正在理解问题、制定分析方案...")
-    logger.info("[%s] >>> node:planner  input=%r", sid, state["user_message"][:120])
+    logger.info("[%s] >>> node:planner  input=%r", sid, query[:120])
     start = time.perf_counter()
     try:
-        plan = run_planner(state["user_message"], state["conversation_history"])
+        plan = run_planner(query, state["conversation_history"])
     except Exception as e:
         elapsed = time.perf_counter() - start
         logger.error("[%s] <<< node:planner  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)

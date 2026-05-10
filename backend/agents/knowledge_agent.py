@@ -47,6 +47,16 @@ def search_docs(query: str, docs_dir: str = _DOCS_DIR) -> list[str]:
     return results
 
 
+def _build_llm() -> ChatOpenAI:
+    cfg = settings["llm"]
+    return ChatOpenAI(
+        base_url=cfg["base_url"],
+        api_key=cfg["api_key"],
+        model=cfg["model"],
+        temperature=cfg["temperature"],
+    )
+
+
 def run_knowledge_agent(
     query: str,
     conversation_history: list,
@@ -83,13 +93,3 @@ def run_knowledge_agent(
     except Exception:
         logger.warning("knowledge_agent: parse failed, return raw", exc_info=True)
         return {"action": "answer", "answer": response.content.strip()}
-
-
-def _build_llm() -> ChatOpenAI:
-    cfg = settings["llm"]
-    return ChatOpenAI(
-        base_url=cfg["base_url"],
-        api_key=cfg["api_key"],
-        model=cfg["model"],
-        temperature=cfg["temperature"],
-    )
