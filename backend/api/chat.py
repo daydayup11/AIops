@@ -49,20 +49,14 @@ async def websocket_chat(ws: WebSocket):
                     loop,
                 )
 
-            def plan_cb(blueprint: list) -> None:
-                logger.info("[%s] plan: %d items", session_id, len(blueprint))
-                asyncio.run_coroutine_threadsafe(
-                    _send(ws, {"type": "plan", "content": blueprint}),
-                    loop,
-                )
-
             state = PipelineState(
                 session_id=session_id,
                 user_message=message,
                 conversation_history=conversation_history.copy(),
                 task_plan=None,
-                sql_tasks=[],
-                execution_results={},
+                py_script=None,
+                code_review_result=None,
+                script_retry_count=0,
                 viz_outputs=[],
                 clarification_needed=False,
                 clarification_question=None,
@@ -72,7 +66,6 @@ async def websocket_chat(ws: WebSocket):
                 summary_report=None,
                 error=None,
                 progress_cb=progress_cb,
-                plan_cb=plan_cb,
             )
 
             logger.info("[%s] pipeline start", session_id)
@@ -94,7 +87,7 @@ async def websocket_chat(ws: WebSocket):
                 await _send(ws, payload)
                 save_message(session_id, "assistant", "text", q)
                 conversation_history.append({"role": "assistant", "content": q})
-                logger.info("[%s] clarifier ask sent  question=%r  options=%s", session_id, q[:60], options)
+                logger.info("[%s] clarifier ask sent", session_id)
                 await _send(ws, {"type": "done", "content": ""})
                 continue
 
@@ -112,15 +105,10 @@ async def websocket_chat(ws: WebSocket):
             for i, output in enumerate(result_state["viz_outputs"]):
                 render = output["render"]
                 content = output["content"]
-                if render == "html":
-                    html_content = open(content, encoding="utf-8").read() if isinstance(content, str) else content
-                    save_message(session_id, "assistant", "html", html_content)
-                    await _send(ws, {"type": "result", "render": "html", "content": html_content})
-                    logger.info("[%s] sent output[%d] html", session_id, i)
-                elif render == "echarts":
-                    save_message(session_id, "assistant", "echarts", json.dumps(content, ensure_ascii=False))
-                    await _send(ws, {"type": "result", "render": "echarts", "content": content})
-                    logger.info("[%s] sent output[%d] echarts", session_id, i)
+                if render == "image":
+                    save_message(session_id, "assistant", "image", content[:100] + "...")
+                    await _send(ws, {"type": "result", "render": "image", "content": content})
+                    logger.info("[%s] sent output[%d] image  b64_len=%d", session_id, i, len(content))
                 else:
                     save_message(session_id, "assistant", "text", str(content))
                     await _send(ws, {"type": "result", "render": "text", "content": content})
@@ -131,13 +119,17 @@ async def websocket_chat(ws: WebSocket):
                 report_payload = report.model_dump()
                 save_message(session_id, "assistant", "text", report.conclusion)
                 await _send(ws, {"type": "summary", "content": report_payload})
-                logger.info("[%s] summary sent  title=%r  points=%d", session_id, report.title, len(report.key_points))
+                logger.info("[%s] summary sent  points=%d", session_id, len(report.key_points))
 
             logger.info("[%s] pipeline done  outputs=%d", session_id, len(result_state["viz_outputs"]))
             await _send(ws, {"type": "done", "content": "分析完成"})
 
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected: %s:%s", client.host if client else "?", client.port if client else "?")
-    except Exception:
+        logger.info("WebSocket disconnected")
+    except Exception as e:
         logger.error("Unexpected WebSocket error", exc_info=True)
-        raise
+        try:
+            await _send(ws, {"type": "error", "content": f"服务器内部错误：{e}"})
+            await _send(ws, {"type": "done", "content": ""})
+        except Exception:
+            pass
