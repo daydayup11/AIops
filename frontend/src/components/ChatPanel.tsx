@@ -5,9 +5,10 @@ import { ProgressBar } from "./ProgressBar";
 
 interface Props {
   messages: ChatMessage[];
+  theme?: "light" | "tech";
 }
 
-export function ChatPanel({ messages }: Props) {
+export function ChatPanel({ messages, theme }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,7 +45,11 @@ export function ChatPanel({ messages }: Props) {
               key={msg.id}
               className="w-full bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-5 shadow-md"
             >
-              <ChartRenderer render={msg.render!} content={msg.content} />
+              <ChartRenderer
+                render={msg.render!}
+                content={msg.content}
+                theme={theme}
+              />
             </div>
           );
         }

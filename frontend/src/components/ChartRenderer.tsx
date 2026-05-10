@@ -1,18 +1,28 @@
 import ReactECharts from "echarts-for-react";
+import "../lib/echartsTheme";
 
 interface Props {
   render: "echarts" | "html" | "table" | "text";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   insight?: string;
+  theme?: "light" | "tech";
 }
 
-export function ChartRenderer({ render, content, insight }: Props) {
+export function ChartRenderer({ render, content, insight, theme }: Props) {
   if (render === "echarts") {
     return (
       <div className="w-full">
-        {insight && <p className="text-sm text-gray-600 mb-2">{insight}</p>}
-        <ReactECharts option={content} style={{ height: 350 }} />
+        {insight && (
+          <p className="text-sm text-[var(--color-muted-foreground)] mb-2">
+            {insight}
+          </p>
+        )}
+        <ReactECharts
+          option={content}
+          theme={theme === "tech" ? "tech" : undefined}
+          style={{ height: 350 }}
+        />
       </div>
     );
   }
@@ -26,5 +36,9 @@ export function ChartRenderer({ render, content, insight }: Props) {
       />
     );
   }
-  return <p className="text-sm text-gray-700 whitespace-pre-wrap">{content}</p>;
+  return (
+    <p className="text-sm text-[var(--color-foreground)] whitespace-pre-wrap">
+      {content}
+    </p>
+  );
 }
