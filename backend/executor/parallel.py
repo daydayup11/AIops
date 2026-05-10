@@ -1,9 +1,13 @@
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional
 
 from models.schemas import SQLTask
 from db.clickhouse import execute_query, SQLSecurityError
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ParallelExecutor:
@@ -12,8 +16,11 @@ class ParallelExecutor:
         self.retry_shrink = settings["executor"]["retry_time_shrink"]
 
     def _run_one(self, task: SQLTask, progress_cb: Optional[Callable] = None) -> dict:
+        start = time.perf_counter()
         try:
             df = execute_query(task.sql)
+            elapsed = time.perf_counter() - start
+            logger.debug("Task %s succeeded: %.2fs, %d rows", task.task_id, elapsed, len(df))
             if progress_cb:
                 progress_cb(task.task_id, "success")
             return {
@@ -23,6 +30,8 @@ class ParallelExecutor:
                 "description": task.description,
             }
         except SQLSecurityError as e:
+            elapsed = time.perf_counter() - start
+            logger.error("Task %s blocked (%.2fs): %s", task.task_id, elapsed, e)
             if progress_cb:
                 progress_cb(task.task_id, "error")
             return {
@@ -32,6 +41,8 @@ class ParallelExecutor:
                 "description": task.description,
             }
         except Exception as e:
+            elapsed = time.perf_counter() - start
+            logger.error("Task %s failed (%.2fs): %s", task.task_id, elapsed, e, exc_info=True)
             if progress_cb:
                 progress_cb(task.task_id, "error")
             return {
@@ -42,20 +53,14 @@ class ParallelExecutor:
             }
 
     def run(self, tasks: list, progress_cb: Optional[Callable] = None) -> dict:
-        """Execute tasks in parallel using a thread pool.
-
-        Args:
-            tasks: List of SQLTask objects to execute.
-            progress_cb: Optional callback(task_id, status) called when each task completes.
-
-        Returns:
-            Dict mapping task_id -> result dict with keys: task_id, status, description,
-            and either 'df' (on success) or 'error' (on failure).
-        """
+        logger.info("Starting parallel execution: %d tasks, max_workers=%d", len(tasks), self.max_workers)
+        start = time.perf_counter()
         results = {}
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             futures = {pool.submit(self._run_one, t, progress_cb): t for t in tasks}
             for future in as_completed(futures):
                 result = future.result()
                 results[result["task_id"]] = result
+        elapsed = time.perf_counter() - start
+        logger.info("All tasks complete: %.2fs", elapsed)
         return results
