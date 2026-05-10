@@ -40,30 +40,31 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
    - 大表（sessions/npm/dns/url）必须加LIMIT
    - 禁止大表相互JOIN
    - 使用ClickHouse语法（now(), INTERVAL 1 DAY等）
-   - 【应用名称】凡涉及 appid 的查询，必须 LEFT JOIN axp ON t.appid = axp.appid，SELECT axp.cname AS app_name，图表 X 轴显示 app_name 而非 appid 数字
+   - [App name] For any query involving appid, you MUST LEFT JOIN axp ON t.appid = axp.appid, SELECT axp.cname AS app_name, and display app_name on the chart X-axis instead of numeric appid
 
-3. **图片输出**：
+3. **Image output**:
    ```python
    output_dir = os.environ['OUTPUT_DIR']
-   plt.savefig(os.path.join(output_dir, '01_图表名.png'), dpi=100, bbox_inches='tight')
+   plt.savefig(os.path.join(output_dir, '01_chart_name.png'), dpi=100, bbox_inches='tight')
    plt.close()
    ```
-   - 文件名用数字前缀排序（01_, 02_）
-   - 只能写入 OUTPUT_DIR，不能写其他路径
-   - 使用matplotlib/seaborn，设置中文字体：`plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']`
+   - Filename must use numeric prefix for ordering (01_, 02_)
+   - Only write to OUTPUT_DIR, no other paths allowed
+   - Use matplotlib/seaborn; use English for all chart titles, axis labels, legend entries, and annotations to avoid encoding issues
+   - Do NOT use Chinese characters in any chart text (titles, labels, ticks, annotations)
 
 4. **错误处理**：每个查询用try/except，失败时打印错误并继续下一个图
 
-5. **数据摘要输出**（可选，失败时静默跳过）：
-   每个图表的plt.savefig之前，将关键数据追加到_summary["charts"]；所有图表完成后写入一次：
+5. **Data summary output** (optional, silently skip on failure):
+   Before each plt.savefig, append key data to _summary["charts"]; write once after all charts:
    ```python
    import json as _json
    _summary = {{"charts": []}}
-   # 在每个图表块中，plt.savefig 之前：
+   # Before each plt.savefig block:
    # _summary["charts"].append({{
-   #     "title": "图表标题",
-   #     "key_findings": ["关键发现1（中文）", "关键发现2"],  # 2-5条最重要发现
-   #     "data": df.head(20).to_dict(orient="records")  # 最多20行原始数据
+   #     "title": "Chart title in English",
+   #     "key_findings": ["Finding 1 in English", "Finding 2"],  # 2-5 most important findings
+   #     "data": df.head(20).to_dict(orient="records")  # at most 20 rows of raw data
    # }})
    try:
        with open(os.path.join(output_dir, 'data_summary.json'), 'w', encoding='utf-8') as _f:
@@ -71,9 +72,9 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
    except Exception:
        pass
    ```
-   - key_findings 用中文自然语言描述该图最重要的2-5条发现（如"BiliBili流量最高：45.2GB"）
-   - data 只取前20行，避免文件过大
-   - 写入用try/except包裹，失败静默跳过，不影响图表输出
+   - key_findings must be written in English (e.g., "BiliBili has the highest traffic: 45.2 GB")
+   - data should include at most 20 rows to avoid large files
+   - Wrap the write call in try/except; silently skip on failure, do not affect chart output
 
 6. **超时意识**：
    - 查询大表时带时间窗口，避免全表扫描
