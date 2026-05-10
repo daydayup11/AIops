@@ -16,9 +16,10 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
 
 ## 脚本要求
 
-1. **数据库连接**：通过环境变量获取参数：
+1. **数据库连接与查询**：通过环境变量获取参数，使用以下固定模板执行查询并转换为DataFrame：
    ```python
    import os
+   import pandas as pd
    from clickhouse_driver import Client
    client = Client(
        host=os.environ['CH_HOST'],
@@ -27,7 +28,12 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
        password=os.environ['CH_PASSWORD'],
        database=os.environ['CH_DATABASE'],
    )
+
+   # 【重要】execute返回 (rows, columns) 元组，必须按此方式转换DataFrame：
+   rows, columns = client.execute("SELECT ...", with_column_types=True)
+   df = pd.DataFrame(rows, columns=[col[0] for col in columns])
    ```
+   **严禁**写成 `df = client.execute(...)` 或 `df[0]`/`df[1]` 的访问方式，否则DataFrame无法正确构建。
 
 2. **SQL规则**（违反会导致查询失败）：
    - 只用SELECT，必须带时间条件（sessions/npm用start，其余用collect_time）

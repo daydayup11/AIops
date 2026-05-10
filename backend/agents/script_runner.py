@@ -51,7 +51,7 @@ def run_script_runner(
             elapsed = time.perf_counter() - t0
             logger.info("script_runner: done  %.2fs  returncode=%d", elapsed, proc.returncode)
             if proc.stdout:
-                logger.debug("script_runner: stdout\n%s", proc.stdout[-1000:])
+                logger.info("script_runner: stdout\n%s", proc.stdout[-1000:])
             if proc.stderr:
                 logger.info("script_runner: stderr\n%s", proc.stderr[-1000:])
 
