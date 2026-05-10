@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import os
 import subprocess
@@ -66,6 +67,16 @@ def run_script_runner(
                 data = png_path.read_bytes()
                 b64 = base64.b64encode(data).decode("ascii")
                 outputs.append({"render": "image", "content": b64})
+
+            json_path = Path(output_dir) / "data_summary.json"
+            if json_path.exists():
+                try:
+                    json_content = json_path.read_text(encoding="utf-8")
+                    outputs.append({"render": "json", "content": json_content})
+                    logger.info("script_runner: data_summary.json found (%d bytes)", len(json_content))
+                except Exception as exc:
+                    logger.warning("script_runner: failed to read data_summary.json: %s", exc)
+
             return outputs
 
         except subprocess.TimeoutExpired:

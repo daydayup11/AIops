@@ -211,8 +211,12 @@ def node_summarizer(state: PipelineState) -> dict:
     analysis_plan = task_plan.analysis_plan if task_plan else None
     try:
         image_count = sum(1 for o in state.get("viz_outputs", []) if o.get("render") == "image")
+        data_summary = next(
+            (o["content"] for o in state.get("viz_outputs", []) if o.get("render") == "json"),
+            None,
+        )
         insights = [{"task_id": "script", "insight_hint": analysis_plan.viz_intent if analysis_plan else "", "charts": image_count}]
-        report = run_summarizer(state["user_message"], insights, analysis_plan=analysis_plan)
+        report = run_summarizer(state["user_message"], insights, analysis_plan=analysis_plan, data_summary=data_summary)
     except Exception as e:
         elapsed = time.perf_counter() - start
         logger.error("[%s] <<< node:summarizer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)

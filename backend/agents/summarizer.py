@@ -57,6 +57,7 @@ def run_summarizer(
     user_message: str,
     insights: list,
     analysis_plan: Optional[AnalysisPlan] = None,
+    data_summary: Optional[str] = None,
     llm=None,
 ) -> SummaryReport:
     llm = llm or _build_llm()
@@ -78,7 +79,8 @@ def run_summarizer(
         _format_insight(i, item) for i, item in enumerate(insights)
     )
 
-    user_content = f"用户问题：{user_message}\n{plan_text}\n实际查询结果：\n{insights_text}"
+    data_text = f"\n\n实际图表数据（JSON）：\n{data_summary}" if data_summary else ""
+    user_content = f"用户问题：{user_message}\n{plan_text}\n实际查询结果：\n{insights_text}{data_text}"
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": user_content},

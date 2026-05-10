@@ -47,7 +47,28 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
 
 4. **错误处理**：每个查询用try/except，失败时打印错误并继续下一个图
 
-5. **超时意识**：
+5. **数据摘要输出**（可选，失败时静默跳过）：
+   每个图表的plt.savefig之前，将关键数据追加到_summary["charts"]；所有图表完成后写入一次：
+   ```python
+   import json as _json
+   _summary = {{"charts": []}}
+   # 在每个图表块中，plt.savefig 之前：
+   # _summary["charts"].append({{
+   #     "title": "图表标题",
+   #     "key_findings": ["关键发现1（中文）", "关键发现2"],  # 2-5条最重要发现
+   #     "data": df.head(20).to_dict(orient="records")  # 最多20行原始数据
+   # }})
+   try:
+       with open(os.path.join(output_dir, 'data_summary.json'), 'w', encoding='utf-8') as _f:
+           _json.dump(_summary, _f, ensure_ascii=False, default=str)
+   except Exception:
+       pass
+   ```
+   - key_findings 用中文自然语言描述该图最重要的2-5条发现（如"BiliBili流量最高：45.2GB"）
+   - data 只取前20行，避免文件过大
+   - 写入用try/except包裹，失败静默跳过，不影响图表输出
+
+6. **超时意识**：
    - 查询大表时带时间窗口，避免全表扫描
    - 复杂聚合用LIMIT控制结果集
    - 整个脚本须在60秒内完成
