@@ -27,10 +27,16 @@ def init_db():
                 role        TEXT NOT NULL,
                 type        TEXT NOT NULL,
                 content     TEXT NOT NULL,
+                image_data  TEXT,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             );
         """)
+        # Migrate existing DB: add image_data if missing
+        try:
+            conn.execute("ALTER TABLE messages ADD COLUMN image_data TEXT")
+        except Exception:
+            pass  # column already exists
 
 
 def create_session(title: str = "新对话") -> str:
@@ -42,11 +48,11 @@ def create_session(title: str = "新对话") -> str:
     return sid
 
 
-def save_message(session_id: str, role: str, msg_type: str, content: str):
+def save_message(session_id: str, role: str, msg_type: str, content: str, image_data: str | None = None):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO messages (session_id, role, type, content) VALUES (?, ?, ?, ?)",
-            (session_id, role, msg_type, content),
+            "INSERT INTO messages (session_id, role, type, content, image_data) VALUES (?, ?, ?, ?, ?)",
+            (session_id, role, msg_type, content, image_data),
         )
         conn.execute(
             "UPDATE sessions SET updated_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -65,7 +71,31 @@ def get_sessions() -> list[dict]:
 def get_session_messages(session_id: str) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM messages WHERE session_id=? ORDER BY id",
+            "SELECT id, session_id, role, type, content, created_at FROM messages WHERE session_id=? ORDER BY id",
             (session_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_message_image(msg_id: int) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT image_data FROM messages WHERE id=?", (msg_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return row["image_data"]
+
+
+def delete_session(session_id: str):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+        conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+
+
+def rename_session(session_id: str, title: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE sessions SET title=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (title, session_id),
+        )
