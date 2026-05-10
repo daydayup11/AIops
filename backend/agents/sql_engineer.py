@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 from langchain_openai import ChatOpenAI
 from models.schemas import SubTask, SQLTask
 from db.schema import TABLE_SCHEMA
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _BIG_TABLES = {"sessions", "npm", "dns", "url"}
 _TIME_FIELDS = {
@@ -82,7 +85,13 @@ def run_sql_engineer(tasks: list, llm=None) -> list:
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": f"为以下子任务生成SQL：\n{task_desc}"},
     ]
-    response = llm.invoke(messages)
+    try:
+        response = llm.invoke(messages)
+    except Exception:
+        logger.error("LLM call failed in sql_engineer", exc_info=True)
+        return []
+
+    logger.debug("SQL engineer raw LLM response: %s", response.content[:500])
     try:
         data = json.loads(response.content)
         result = []
@@ -91,6 +100,8 @@ def run_sql_engineer(tasks: list, llm=None) -> list:
             matched_task = task_map.get(item["task_id"], tasks[0])
             sql = optimize_sql(item["sql"], matched_task.tables)
             result.append(SQLTask(task_id=item["task_id"], sql=sql, description=item["description"]))
+        logger.info("SQL tasks generated: %d", len(result))
         return result
     except Exception:
+        logger.warning("SQL engineer JSON parse failed, returning empty list", exc_info=True)
         return []
