@@ -5,6 +5,7 @@ import { SessionSidebar } from "./components/SessionSidebar";
 import { ChatPanel } from "./components/ChatPanel";
 import { InputBar } from "./components/InputBar";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { useTheme } from "./hooks/useTheme";
 import { Button } from "./components/ui/button";
 import {
   Tooltip,
@@ -18,6 +19,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState(() => uuidv4());
   const [sessions, setSessions] = useState<Session[]>([]);
   const { messages, isLoading, sendMessage } = useWebSocket(sessionId);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch("http://localhost:8000/api/v1/sessions")
@@ -41,11 +43,26 @@ export default function App() {
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="主题">
-                  <Moon className="h-4 w-4 text-[var(--color-muted-foreground)]" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="切换主题"
+                  onClick={toggleTheme}
+                >
+                  <Moon
+                    className="h-4 w-4"
+                    style={{
+                      color:
+                        theme === "tech"
+                          ? "var(--color-accent)"
+                          : "var(--color-muted-foreground)",
+                    }}
+                  />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>切换主题（暂未实现）</TooltipContent>
+              <TooltipContent>
+                {theme === "tech" ? "切换到简明风" : "切换到科技风"}
+              </TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -65,7 +82,7 @@ export default function App() {
             onNew={handleNew}
           />
           <div className="flex flex-col flex-1 overflow-hidden">
-            <ChatPanel messages={messages} />
+            <ChatPanel messages={messages} theme={theme} />
             <InputBar onSend={sendMessage} disabled={isLoading} />
           </div>
         </div>
