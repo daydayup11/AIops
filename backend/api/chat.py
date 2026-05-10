@@ -1,6 +1,7 @@
+import asyncio
 import json
 import logging
-import uuid
+from functools import partial
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from db.sqlite import create_session, save_message
 from graph.pipeline import build_pipeline, PipelineState
@@ -17,6 +18,10 @@ def get_pipeline():
     return _pipeline
 
 
+async def _send(ws: WebSocket, payload: dict) -> None:
+    await ws.send_text(json.dumps(payload, ensure_ascii=False))
+
+
 @router.websocket("/chat")
 async def websocket_chat(ws: WebSocket):
     await ws.accept()
@@ -30,15 +35,26 @@ async def websocket_chat(ws: WebSocket):
             data = json.loads(raw)
             session_id = data.get("session_id") or create_session()
             message = data["message"]
-            logger.info("Message received: session=%s, length=%d", session_id, len(message))
+            logger.info("[%s] message received  len=%d", session_id, len(message))
 
             save_message(session_id, "user", "text", message)
             conversation_history.append({"role": "user", "content": message})
 
-            await ws.send_text(json.dumps({"type": "progress", "content": "正在分析您的问题..."}))
+            loop = asyncio.get_event_loop()
 
-            def sync_progress_cb(task_id: str, status: str):
-                pass
+            def progress_cb(text: str) -> None:
+                logger.info("[%s] progress: %s", session_id, text)
+                asyncio.run_coroutine_threadsafe(
+                    _send(ws, {"type": "progress", "content": text}),
+                    loop,
+                )
+
+            def plan_cb(blueprint: list) -> None:
+                logger.info("[%s] plan: %d items", session_id, len(blueprint))
+                asyncio.run_coroutine_threadsafe(
+                    _send(ws, {"type": "plan", "content": blueprint}),
+                    loop,
+                )
 
             state = PipelineState(
                 session_id=session_id,
@@ -50,42 +66,75 @@ async def websocket_chat(ws: WebSocket):
                 viz_outputs=[],
                 clarification_needed=False,
                 clarification_question=None,
+                clarifier_done=False,
+                clarifier_question=None,
+                clarifier_options=[],
+                summary_report=None,
                 error=None,
-                progress_cb=sync_progress_cb,
+                progress_cb=progress_cb,
+                plan_cb=plan_cb,
             )
 
+            logger.info("[%s] pipeline start", session_id)
             try:
-                result_state = get_pipeline().invoke(state)
+                result_state = await loop.run_in_executor(
+                    None, partial(get_pipeline().invoke, state)
+                )
             except Exception as e:
-                logger.error("Pipeline execution failed: %s", e, exc_info=True)
-                await ws.send_text(json.dumps({"type": "error", "content": str(e)}))
-                await ws.send_text(json.dumps({"type": "done", "content": ""}))
+                logger.error("[%s] pipeline failed: %s", session_id, e, exc_info=True)
+                await _send(ws, {"type": "error", "content": str(e)})
+                await _send(ws, {"type": "done", "content": ""})
                 continue
 
-            if result_state["clarification_needed"]:
-                q = result_state["clarification_question"]
-                await ws.send_text(json.dumps({"type": "clarify", "content": q}))
+            # clarifier 追问
+            if not result_state.get("clarifier_done", True) and result_state.get("clarifier_question"):
+                q = result_state["clarifier_question"]
+                options = result_state.get("clarifier_options", [])
+                payload = {"type": "clarify", "question": q, "options": options, "allow_free_input": True}
+                await _send(ws, payload)
                 save_message(session_id, "assistant", "text", q)
                 conversation_history.append({"role": "assistant", "content": q})
+                logger.info("[%s] clarifier ask sent  question=%r  options=%s", session_id, q[:60], options)
+                await _send(ws, {"type": "done", "content": ""})
                 continue
 
-            for output in result_state["viz_outputs"]:
+            # planner 澄清（兜底）
+            if result_state["clarification_needed"]:
+                q = result_state["clarification_question"]
+                await _send(ws, {"type": "clarify", "question": q, "options": [], "allow_free_input": True})
+                save_message(session_id, "assistant", "text", q)
+                conversation_history.append({"role": "assistant", "content": q})
+                logger.info("[%s] planner clarification sent", session_id)
+                await _send(ws, {"type": "done", "content": ""})
+                continue
+
+            # 图表结果
+            for i, output in enumerate(result_state["viz_outputs"]):
                 render = output["render"]
                 content = output["content"]
                 if render == "html":
                     html_content = open(content, encoding="utf-8").read() if isinstance(content, str) else content
                     save_message(session_id, "assistant", "html", html_content)
-                    await ws.send_text(json.dumps({"type": "result", "render": "html", "content": html_content}))
+                    await _send(ws, {"type": "result", "render": "html", "content": html_content})
+                    logger.info("[%s] sent output[%d] html", session_id, i)
                 elif render == "echarts":
-                    payload = json.dumps(content, ensure_ascii=False)
-                    save_message(session_id, "assistant", "echarts", payload)
-                    await ws.send_text(json.dumps({"type": "result", "render": "echarts", "content": content}))
+                    save_message(session_id, "assistant", "echarts", json.dumps(content, ensure_ascii=False))
+                    await _send(ws, {"type": "result", "render": "echarts", "content": content})
+                    logger.info("[%s] sent output[%d] echarts", session_id, i)
                 else:
                     save_message(session_id, "assistant", "text", str(content))
-                    await ws.send_text(json.dumps({"type": "result", "render": "text", "content": content}))
+                    await _send(ws, {"type": "result", "render": "text", "content": content})
 
-            logger.info("Response sent: session=%s, outputs=%d", session_id, len(result_state["viz_outputs"]))
-            await ws.send_text(json.dumps({"type": "done", "content": "分析完成"}))
+            # 综合报告
+            report = result_state.get("summary_report")
+            if report:
+                report_payload = report.model_dump()
+                save_message(session_id, "assistant", "text", report.conclusion)
+                await _send(ws, {"type": "summary", "content": report_payload})
+                logger.info("[%s] summary sent  title=%r  points=%d", session_id, report.title, len(report.key_points))
+
+            logger.info("[%s] pipeline done  outputs=%d", session_id, len(result_state["viz_outputs"]))
+            await _send(ws, {"type": "done", "content": "分析完成"})
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected: %s:%s", client.host if client else "?", client.port if client else "?")
