@@ -84,6 +84,9 @@ def run_sql_engineer(
 ) -> Optional[PyScript]:
     llm = llm or _build_llm()
     ap = task_plan.analysis_plan
+    if ap is None:
+        logger.error("sql_engineer: analysis_plan is None, cannot generate script")
+        return None
 
     user_content = f"""分析目标：{ap.goal}
 分析思路：{ap.approach}
@@ -113,7 +116,11 @@ def run_sql_engineer(
     # Strip markdown code fences if LLM adds them despite instructions
     if script_code.startswith("```"):
         lines = script_code.split('\n')
-        script_code = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+        end_idx = next(
+            (i for i in range(len(lines) - 1, 0, -1) if lines[i].strip() == "```"),
+            None,
+        )
+        script_code = '\n'.join(lines[1:end_idx] if end_idx is not None else lines[1:])
 
     description = ap.goal
     return PyScript(script_code=script_code, description=description)
