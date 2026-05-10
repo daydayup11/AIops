@@ -96,6 +96,11 @@ async def websocket_chat(ws: WebSocket):
                 summary_report=None,
                 error=None,
                 progress_cb=progress_cb,
+                intent=None,
+                rewritten_query=None,
+                intent_confidence=0.0,
+                knowledge_answer=None,
+                chitchat_answer=None,
             )
 
             logger.info("[%s] pipeline start", session_id)
@@ -106,6 +111,38 @@ async def websocket_chat(ws: WebSocket):
             except Exception as e:
                 logger.error("[%s] pipeline failed: %s", session_id, e, exc_info=True)
                 await _send(ws, {"type": "error", "content": str(e)})
+                await _send(ws, {"type": "done", "content": ""})
+                continue
+
+            # knowledge_qa 澄清追问
+            if result_state.get("intent") == "knowledge_qa" and not result_state.get("clarifier_done", True) and result_state.get("clarifier_question"):
+                q = result_state["clarifier_question"]
+                options = result_state.get("clarifier_options", [])
+                payload = {"type": "clarify", "question": q, "options": options, "allow_free_input": True}
+                await _send(ws, payload)
+                save_message(session_id, "assistant", "text", q)
+                conversation_history.append({"role": "assistant", "content": q})
+                logger.info("[%s] knowledge clarification sent", session_id)
+                await _send(ws, {"type": "done", "content": ""})
+                continue
+
+            # knowledge_qa 回答
+            knowledge_answer = result_state.get("knowledge_answer")
+            if knowledge_answer:
+                save_message(session_id, "assistant", "text", knowledge_answer)
+                await _send(ws, {"type": "result", "render": "text", "content": knowledge_answer})
+                conversation_history.append({"role": "assistant", "content": knowledge_answer})
+                logger.info("[%s] knowledge answer sent  len=%d", session_id, len(knowledge_answer))
+                await _send(ws, {"type": "done", "content": ""})
+                continue
+
+            # chitchat 回答
+            chitchat_answer = result_state.get("chitchat_answer")
+            if chitchat_answer:
+                save_message(session_id, "assistant", "text", chitchat_answer)
+                await _send(ws, {"type": "result", "render": "text", "content": chitchat_answer})
+                conversation_history.append({"role": "assistant", "content": chitchat_answer})
+                logger.info("[%s] chitchat answer sent  len=%d", session_id, len(chitchat_answer))
                 await _send(ws, {"type": "done", "content": ""})
                 continue
 
