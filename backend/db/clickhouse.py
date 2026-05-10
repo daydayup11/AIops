@@ -1,7 +1,11 @@
+import logging
 import re
+import time
 import pandas as pd
 from clickhouse_driver import Client
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _cfg = settings["clickhouse"]
 
@@ -26,12 +30,23 @@ class SQLSecurityError(Exception):
 
 def execute_query(sql: str, timeout: int = None) -> pd.DataFrame:
     if _FORBIDDEN.match(sql):
+        logger.warning("SQL security block: %s", sql[:60])
         raise SQLSecurityError(f"拒绝执行非SELECT语句: {sql[:60]}")
     t = timeout or _cfg.get("query_timeout", 30)
-    rows, columns = _client.execute(
-        sql,
-        with_column_types=True,
-        settings={"max_execution_time": t},
-    )
-    col_names = [c[0] for c in columns]
-    return pd.DataFrame(rows, columns=col_names)
+    logger.debug("Executing SQL: %s", sql[:200])
+    start = time.perf_counter()
+    try:
+        rows, columns = _client.execute(
+            sql,
+            with_column_types=True,
+            settings={"max_execution_time": t},
+        )
+        elapsed = time.perf_counter() - start
+        col_names = [c[0] for c in columns]
+        df = pd.DataFrame(rows, columns=col_names)
+        logger.debug("Query complete: %.2fs, %d rows", elapsed, len(df))
+        return df
+    except Exception:
+        elapsed = time.perf_counter() - start
+        logger.error("ClickHouse query failed after %.2fs: %s", elapsed, sql[:200], exc_info=True)
+        raise
