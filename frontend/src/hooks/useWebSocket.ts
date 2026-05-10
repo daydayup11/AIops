@@ -17,6 +17,11 @@ export function useWebSocket(
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSessionTitleRef = useRef(onSessionTitle);
+
+  useEffect(() => {
+    onSessionTitleRef.current = onSessionTitle;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +56,7 @@ export function useWebSocket(
         const msg: WSMessage = JSON.parse(event.data);
 
         if (msg.type === "session_title") {
-          if (onSessionTitle) {
-            onSessionTitle(msg.session_id as string, msg.title as string);
-          }
+          onSessionTitleRef.current?.(msg.session_id ?? "", msg.title ?? "");
           return;
         }
 

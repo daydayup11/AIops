@@ -10,6 +10,8 @@ export interface WSMessage {
   question?: string;
   options?: string[];
   allow_free_input?: boolean;
+  session_id?: string;   // present on session_title messages
+  title?: string;        // present on session_title messages
 }
 
 export interface ChatMessage {
