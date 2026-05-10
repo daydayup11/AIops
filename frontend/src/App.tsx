@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Settings, Moon } from "lucide-react";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { ChatPanel } from "./components/ChatPanel";
 import { InputBar } from "./components/InputBar";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { useSessionMessages } from "./hooks/useSessionMessages";
 import { useTheme } from "./hooks/useTheme";
 import { Button } from "./components/ui/button";
 import {
@@ -15,20 +16,63 @@ import {
 } from "./components/ui/tooltip";
 import type { Session } from "./types";
 
+const API_BASE = "http://localhost:8000/api/v1";
+
 export default function App() {
   const [sessionId, setSessionId] = useState(() => uuidv4());
   const [sessions, setSessions] = useState<Session[]>([]);
-  const { messages, isLoading, sendMessage } = useWebSocket(sessionId);
   const { theme, toggleTheme } = useTheme();
 
+  const handleSessionTitle = useCallback((id: string, title: string) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title } : s))
+    );
+  }, []);
+
+  const { messages: liveMessages, isLoading, sendMessage } = useWebSocket(
+    sessionId,
+    handleSessionTitle,
+  );
+
+  const { historyMessages, historyError } = useSessionMessages(sessionId);
+
+  const allMessages = [...historyMessages, ...liveMessages];
+
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/sessions")
+    fetch(`${API_BASE}/sessions`)
       .then((r) => r.json())
       .then(setSessions)
       .catch(() => {});
-  }, [sessionId]);
+  }, []);
 
-  const handleNew = () => setSessionId(uuidv4());
+  const handleNew = () => {
+    const id = uuidv4();
+    setSessionId(id);
+  };
+
+  const handleSelect = (id: string) => {
+    setSessionId(id);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== id);
+      if (id === sessionId) {
+        if (remaining.length > 0) {
+          setSessionId(remaining[0].id);
+        } else {
+          setSessionId(uuidv4());
+        }
+      }
+      return remaining;
+    });
+  };
+
+  const handleRenameSession = (id: string, title: string) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title } : s))
+    );
+  };
 
   return (
     <TooltipProvider>
@@ -78,11 +122,22 @@ export default function App() {
           <SessionSidebar
             sessions={sessions}
             activeId={sessionId}
-            onSelect={setSessionId}
+            onSelect={handleSelect}
             onNew={handleNew}
+            onDelete={handleDeleteSession}
+            onRename={handleRenameSession}
           />
           <div className="flex flex-col flex-1 overflow-hidden">
-            <ChatPanel messages={messages} onSend={sendMessage} />
+            {historyError && (
+              <div className="px-4 py-2 text-sm text-[var(--color-destructive)] bg-[var(--color-destructive)]/10 border-b border-[var(--color-destructive)]/20">
+                {historyError}
+              </div>
+            )}
+            <ChatPanel
+              messages={allMessages}
+              onSend={sendMessage}
+              sessionId={sessionId}
+            />
             <InputBar onSend={sendMessage} disabled={isLoading} />
           </div>
         </div>
