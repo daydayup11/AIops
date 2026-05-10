@@ -79,3 +79,13 @@ def test_patch_session_title(client):
 def test_patch_session_not_found(client):
     r = client.patch("/api/v1/sessions/nonexistent", json={"title": "x"})
     assert r.status_code == 404
+
+def test_get_message_image_wrong_session(client):
+    sid1 = db_module.create_session("s1")
+    sid2 = db_module.create_session("s2")
+    db_module.save_message(sid1, "assistant", "image", "[图表]", image_data="b64data")
+    msgs = db_module.get_session_messages(sid1)
+    msg_id = msgs[0]["id"]
+    # Access msg_id from sid1 via sid2's URL — should 404
+    r = client.get(f"/api/v1/sessions/{sid2}/messages/{msg_id}/image")
+    assert r.status_code == 404

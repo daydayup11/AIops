@@ -89,6 +89,25 @@ def get_message_image(msg_id: int) -> str | None:
     return row["image_data"]
 
 
+def get_message_image_for_session(msg_id: int, session_id: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT image_data FROM messages WHERE id=? AND session_id=?",
+            (msg_id, session_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return row["image_data"]
+
+
+def get_session_by_id(session_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def delete_session(session_id: str):
     with get_conn() as conn:
         conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))

@@ -4,6 +4,8 @@ from db.sqlite import (
     get_sessions,
     get_session_messages,
     get_message_image,
+    get_message_image_for_session,
+    get_session_by_id,
     delete_session,
     rename_session,
 )
@@ -30,7 +32,7 @@ def list_messages(session_id: str):
 
 @router.get("/sessions/{session_id}/messages/{msg_id}/image")
 def get_image(session_id: str, msg_id: int):
-    data = get_message_image(msg_id)
+    data = get_message_image_for_session(msg_id, session_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Image not found")
     return {"image_data": data}
@@ -51,5 +53,7 @@ def update_session(session_id: str, body: PatchSessionBody):
     if not any(s["id"] == session_id for s in sessions):
         raise HTTPException(status_code=404, detail="Session not found")
     rename_session(session_id, body.title)
-    updated = next(s for s in get_sessions() if s["id"] == session_id)
+    updated = get_session_by_id(session_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Session not found")
     return updated
