@@ -93,6 +93,9 @@ def run_planner(
             for t in plan.tasks:
                 logger.info("planner: task  id=%s  tables=%s  hours=%s  desc=%r",
                             t.id, t.tables, t.time_range_hours, t.description)
+            for bp in plan.viz_blueprint:
+                logger.info("planner: blueprint  task_id=%s  chart=%s  x=%s  y=%s",
+                            bp.task_id, bp.chart_type, bp.x_field, bp.y_field)
         return plan
     except Exception:
         logger.warning("planner: JSON parse failed, falling back to clarification", exc_info=True)
