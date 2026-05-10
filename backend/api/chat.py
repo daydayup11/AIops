@@ -37,7 +37,7 @@ def _get_llm() -> ChatOpenAI:
 async def generate_and_push_title(session_id: str, user_message: str, send_fn) -> None:
     try:
         llm = _get_llm()
-        result = await asyncio.get_event_loop().run_in_executor(
+        result = await asyncio.get_running_loop().run_in_executor(
             None,
             lambda: llm.invoke([
                 {"role": "system", "content": "用不超过10个字概括这个问题，只输出标题，不加标点"},
@@ -151,7 +151,7 @@ async def websocket_chat(ws: WebSocket):
                 logger.info("[%s] summary sent  points=%d", session_id, len(report.key_points))
 
             logger.info("[%s] pipeline done  outputs=%d", session_id, len(result_state["viz_outputs"]))
-            asyncio.ensure_future(
+            asyncio.create_task(
                 generate_and_push_title(session_id, message, lambda p: _send(ws, p))
             )
             await _send(ws, {"type": "done", "content": "分析完成"})
