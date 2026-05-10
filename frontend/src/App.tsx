@@ -24,9 +24,12 @@ export default function App() {
   const { theme, toggleTheme } = useTheme();
 
   const handleSessionTitle = useCallback((id: string, title: string) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, title } : s))
-    );
+    setSessions((prev) => {
+      const exists = prev.some((s) => s.id === id);
+      if (exists) return prev.map((s) => (s.id === id ? { ...s, title } : s));
+      const now = new Date().toISOString();
+      return [{ id, title, created_at: now, updated_at: now }, ...prev];
+    });
   }, []);
 
   const { messages: liveMessages, isLoading, sendMessage } = useWebSocket(

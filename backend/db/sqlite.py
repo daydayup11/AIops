@@ -120,3 +120,11 @@ def rename_session(session_id: str, title: str):
             "UPDATE sessions SET title=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (title, session_id),
         )
+
+
+def ensure_session(session_id: str, title: str = "新对话") -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO sessions (id, title) VALUES (?, ?)",
+            (session_id, title),
+        )

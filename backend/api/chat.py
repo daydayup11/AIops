@@ -4,7 +4,7 @@ import logging
 from functools import partial
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from langchain_openai import ChatOpenAI
-from db.sqlite import create_session, save_message, rename_session
+from db.sqlite import create_session, save_message, rename_session, ensure_session
 from graph.pipeline import build_pipeline, PipelineState
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ async def websocket_chat(ws: WebSocket):
             raw = await ws.receive_text()
             data = json.loads(raw)
             session_id = data.get("session_id") or create_session()
+            ensure_session(session_id)
             message = data["message"]
             logger.info("[%s] message received  len=%d", session_id, len(message))
 
