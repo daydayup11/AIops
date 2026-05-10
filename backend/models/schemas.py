@@ -9,7 +9,7 @@ class WSIncoming(BaseModel):
 
 
 class WSMessage(BaseModel):
-    type: Literal["clarify", "progress", "result", "error", "done"]
+    type: Literal["clarify", "progress", "result", "plan", "summary", "error", "done"]
     content: Any
     render: Optional[Literal["echarts", "html", "table", "text"]] = None
     elapsed: Optional[float] = None
@@ -22,8 +22,18 @@ class SubTask(BaseModel):
     time_range_hours: int = 24
 
 
+class VizBlueprint(BaseModel):
+    task_id: str
+    chart_type: str
+    title: str
+    x_field: str
+    y_field: str
+    insight_hint: str
+
+
 class TaskPlan(BaseModel):
     tasks: list[SubTask]
+    viz_blueprint: list[VizBlueprint] = Field(default_factory=list)
     clarification_needed: bool = False
     clarification_question: Optional[str] = None
     estimated_seconds: int = 10
@@ -43,6 +53,12 @@ class VizSpec(BaseModel):
     y_field: Optional[str] = None
     series_field: Optional[str] = None
     insight: str = ""
+
+
+class SummaryReport(BaseModel):
+    title: str
+    key_points: list[str]
+    conclusion: str
 
 
 class ChatMessage(BaseModel):
