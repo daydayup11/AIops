@@ -13,6 +13,12 @@ cd "$SCRIPT_DIR"
 
 MODE="${1:-dev}"
 
+# Validate mode parameter
+if [ "$MODE" != "dev" ] && [ "$MODE" != "prod" ]; then
+    echo -e "${RED}用法: $0 [dev|prod]${NC}"
+    exit 1
+fi
+
 print_header() {
     echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}  AIops 一键启动脚本${NC}"
@@ -42,10 +48,13 @@ PIDS=()
 cleanup() {
     echo -e "\n${YELLOW}正在停止所有服务...${NC}"
     for pid in "${PIDS[@]}"; do
+        # Kill the entire subprocess tree
+        pkill -P "$pid" 2>/dev/null || true
         kill "$pid" 2>/dev/null || true
     done
     sleep 1
     for pid in "${PIDS[@]}"; do
+        pkill -9 -P "$pid" 2>/dev/null || true
         kill -9 "$pid" 2>/dev/null || true
     done
     echo -e "${GREEN}✅ 所有服务已停止${NC}\n"
@@ -79,7 +88,7 @@ if [ "$MODE" = "prod" ]; then
     fi
     echo -e "${GREEN}✅ 前端构建完成${NC}\n"
 
-    (cd backend && .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 2>&1 | sed "s/^/[后端] /") &
+    (cd backend && PYTHONUNBUFFERED=1 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 2>&1 | sed "s/^/[后端] /") &
     PIDS+=($!)
 
     (cd frontend && npm run preview 2>&1 | sed "s/^/[前端] /") &
@@ -91,7 +100,7 @@ if [ "$MODE" = "prod" ]; then
 else
     echo -e "${BLUE}🚀 开发模式启动中...${NC}\n"
 
-    (cd backend && .venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000 2>&1 | sed "s/^/[后端] /") &
+    (cd backend && PYTHONUNBUFFERED=1 .venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000 2>&1 | sed "s/^/[后端] /") &
     PIDS+=($!)
 
     (cd frontend && npm run dev 2>&1 | sed "s/^/[前端] /") &
