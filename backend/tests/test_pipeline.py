@@ -61,3 +61,11 @@ def test_pipeline_routes_to_sql_engineer():
         progress_cb=None,
     )
     assert route_after_planner(state) == "sql_engineer"
+
+
+def test_pipeline_has_clarifier_node():
+    from graph.pipeline import build_pipeline
+    pipeline = build_pipeline()
+    node_names = set(pipeline.nodes.keys())
+    assert "clarifier" in node_names, f"缺少 clarifier 节点，现有节点: {node_names}"
+    assert "summarizer" in node_names, f"缺少 summarizer 节点，现有节点: {node_names}"
