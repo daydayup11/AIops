@@ -15,8 +15,13 @@ def test_pipeline_state_schema():
         viz_outputs=[],
         clarification_needed=False,
         clarification_question=None,
+        clarifier_done=False,
+        clarifier_question=None,
+        clarifier_options=[],
+        summary_report=None,
         error=None,
         progress_cb=None,
+        plan_cb=None,
     )
     assert state["session_id"] == "test-123"
 
@@ -39,8 +44,13 @@ def test_pipeline_routes_to_clarify():
         viz_outputs=[],
         clarification_needed=True,
         clarification_question="请说明时间范围",
+        clarifier_done=False,
+        clarifier_question=None,
+        clarifier_options=[],
+        summary_report=None,
         error=None,
         progress_cb=None,
+        plan_cb=None,
     )
     assert route_after_planner(state) == "end_clarify"
 
@@ -57,8 +67,13 @@ def test_pipeline_routes_to_sql_engineer():
         viz_outputs=[],
         clarification_needed=False,
         clarification_question=None,
+        clarifier_done=False,
+        clarifier_question=None,
+        clarifier_options=[],
+        summary_report=None,
         error=None,
         progress_cb=None,
+        plan_cb=None,
     )
     assert route_after_planner(state) == "sql_engineer"
 
