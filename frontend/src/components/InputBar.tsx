@@ -1,4 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
+import { SendHorizonal } from "lucide-react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 interface Props {
   onSend: (text: string) => void;
@@ -22,22 +25,30 @@ export function InputBar({ onSend, disabled }: Props) {
   };
 
   return (
-    <div className="flex gap-2 p-4 border-t bg-white">
-      <input
-        className="flex-1 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
-        placeholder="输入分析问题，例如：分析昨天各出口线路的流量分布"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKey}
-        disabled={disabled}
-      />
-      <button
-        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+    <div className="flex gap-2 px-5 py-4 border-t bg-[var(--color-card)] items-center">
+      <div className="relative flex-1">
+        <Input
+          className="pr-16 h-10 text-sm"
+          placeholder="输入分析问题，例如：分析昨天各出口线路的流量分布"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKey}
+          disabled={disabled}
+        />
+        {!value && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-muted-foreground)] pointer-events-none select-none">
+            ⏎ 发送
+          </span>
+        )}
+      </div>
+      <Button
         onClick={handleSend}
         disabled={disabled || !value.trim()}
+        size="icon"
+        className="h-10 w-10 shrink-0"
       >
-        发送
-      </button>
+        <SendHorizonal className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
