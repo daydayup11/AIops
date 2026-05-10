@@ -1,6 +1,8 @@
 import logging
 import re
+import threading
 import time
+import ipaddress
 import pandas as pd
 from clickhouse_driver import Client
 from config import settings
@@ -8,15 +10,20 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 _cfg = settings["clickhouse"]
+_local = threading.local()
 
-_client = Client(
-    host=_cfg["host"],
-    port=_cfg["port"],
-    user=_cfg["user"],
-    password=_cfg["password"],
-    database=_cfg["database"],
-    connect_timeout=_cfg["connect_timeout"],
-)
+
+def _get_client() -> Client:
+    if not hasattr(_local, "client"):
+        _local.client = Client(
+            host=_cfg["host"],
+            port=_cfg["port"],
+            user=_cfg["user"],
+            password=_cfg["password"],
+            database=_cfg["database"],
+            connect_timeout=_cfg["connect_timeout"],
+        )
+    return _local.client
 
 _FORBIDDEN = re.compile(
     r"^\s*(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|RENAME|ATTACH|DETACH)",
@@ -36,7 +43,7 @@ def execute_query(sql: str, timeout: int = None) -> pd.DataFrame:
     logger.debug("Executing SQL: %s", sql[:200])
     start = time.perf_counter()
     try:
-        rows, columns = _client.execute(
+        rows, columns = _get_client().execute(
             sql,
             with_column_types=True,
             settings={"max_execution_time": t},
@@ -44,6 +51,11 @@ def execute_query(sql: str, timeout: int = None) -> pd.DataFrame:
         elapsed = time.perf_counter() - start
         col_names = [c[0] for c in columns]
         df = pd.DataFrame(rows, columns=col_names)
+        for col in df.columns:
+            if df[col].dtype == object:
+                df[col] = df[col].apply(
+                    lambda v: str(v) if isinstance(v, (ipaddress.IPv4Address, ipaddress.IPv6Address)) else v
+                )
         logger.debug("Query complete: %.2fs, %d rows", elapsed, len(df))
         return df
     except Exception:

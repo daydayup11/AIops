@@ -5,15 +5,14 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-_FORCE_CONTINUE_KEYWORDS = {"开始分析", "就这样", "直接查", "不用问了", "跳过", "直接分析"}
+_FORCE_CONTINUE_KEYWORDS = {"开始分析", "就这样", "可以", "不用问了", "跳过", "直接分析"}
 
 _SYSTEM_PROMPT = """你是校园网流量分析助手的需求澄清专家。
 判断用户的问题是否已经足够明确，可以直接开始分析。
 
 明确的需求应包含：
 1. 时间范围（如"过去24小时"、"最近一周"）
-2. 分析维度（如"按应用"、"按用户"、"按时段"）
-3. 分析目标（如"排行"、"趋势"、"异常"）
+2. 分析目标（如"排行"、"趋势"、"异常"）
 
 返回严格JSON（不要Markdown代码块）：
 - 需求明确：{"action": "continue"}
