@@ -50,17 +50,26 @@ def run_script_runner(
             )
             elapsed = time.perf_counter() - t0
             logger.info("script_runner: done  %.2fs  returncode=%d", elapsed, proc.returncode)
+            if proc.stdout:
+                logger.debug("script_runner: stdout\n%s", proc.stdout[-1000:])
+            if proc.stderr:
+                logger.info("script_runner: stderr\n%s", proc.stderr[-1000:])
 
             if proc.returncode != 0:
                 err = proc.stderr[-500:] if proc.stderr else "脚本执行失败"
                 logger.warning("script_runner: script failed\n%s", proc.stderr)
                 return [{"render": "text", "content": f"⚠️ 脚本执行错误：{err}"}]
 
+            all_files = list(Path(output_dir).iterdir())
+            logger.info("script_runner: output_dir contents: %s", [f.name for f in all_files])
             png_files = sorted(Path(output_dir).glob("*.png"))
             logger.info("script_runner: found %d PNG files", len(png_files))
 
             if not png_files:
-                return [{"render": "text", "content": "⚠️ 脚本执行完成但未生成图表，请重试"}]
+                stdout_hint = proc.stdout[-300:] if proc.stdout else ""
+                stderr_hint = proc.stderr[-300:] if proc.stderr else ""
+                detail = f"stdout: {stdout_hint}\nstderr: {stderr_hint}".strip()
+                return [{"render": "text", "content": f"⚠️ 脚本执行完成但未生成图表，请重试\n{detail}"}]
 
             outputs = []
             for png_path in png_files:

@@ -151,6 +151,7 @@ def node_sql_engineer(state: PipelineState) -> dict:
         }
     _emit(state, f"✅ 脚本生成完成（{len(py_script.script_code)}字符）")
     logger.info("[%s] <<< node:sql_engineer  %.2fs  script_len=%d", sid, elapsed, len(py_script.script_code))
+    logger.info("[%s] generated script:\n%s", sid, py_script.script_code)
     return {"py_script": py_script}
 
 
