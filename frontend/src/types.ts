@@ -1,4 +1,4 @@
-export type MessageType = "clarify" | "progress" | "result" | "plan" | "summary" | "error" | "done" | "user";
+export type MessageType = "clarify" | "progress" | "result" | "plan" | "summary" | "error" | "done" | "user" | "session_title";
 export type RenderType = "image" | "text" | "image-placeholder";
 
 export interface WSMessage {

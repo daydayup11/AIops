@@ -7,7 +7,10 @@ const PROGRESS_BUBBLE_ID = "__progress__";
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-export function useWebSocket(sessionId: string) {
+export function useWebSocket(
+  sessionId: string,
+  onSessionTitle?: (id: string, title: string) => void,
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [connected, setConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +20,8 @@ export function useWebSocket(sessionId: string) {
 
   useEffect(() => {
     let cancelled = false;
+    setMessages([]);
+    setIsLoading(false);
 
     function connect() {
       if (cancelled) return;
@@ -44,6 +49,13 @@ export function useWebSocket(sessionId: string) {
       ws.onmessage = (event) => {
         if (cancelled) return;
         const msg: WSMessage = JSON.parse(event.data);
+
+        if (msg.type === "session_title") {
+          if (onSessionTitle) {
+            onSessionTitle(msg.session_id as string, msg.title as string);
+          }
+          return;
+        }
 
         if (msg.type === "done") {
           setMessages((prev) => prev.filter((m) => m.id !== PROGRESS_BUBBLE_ID));
