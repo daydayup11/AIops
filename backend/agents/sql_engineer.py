@@ -35,11 +35,12 @@ _SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
    ```
    **严禁**写成 `df = client.execute(...)` 或 `df[0]`/`df[1]` 的访问方式，否则DataFrame无法正确构建。
 
-2. **SQL规则**（违反会导致查询失败）：
+2. **SQL规则**（违反会导致查询失败或结果不可用）：
    - 只用SELECT，必须带时间条件（sessions/npm用start，其余用collect_time）
    - 大表（sessions/npm/dns/url）必须加LIMIT
    - 禁止大表相互JOIN
    - 使用ClickHouse语法（now(), INTERVAL 1 DAY等）
+   - 【应用名称】凡涉及 appid 的查询，必须 LEFT JOIN axp ON t.appid = axp.appid，SELECT axp.cname AS app_name，图表 X 轴显示 app_name 而非 appid 数字
 
 3. **图片输出**：
    ```python
