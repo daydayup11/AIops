@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Session } from "../types";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
@@ -50,6 +50,12 @@ function SessionRow({ session, isActive, onSelect, onDelete, onRename }: Session
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    return () => {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    };
+  }, []);
+
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setEditing(true);
@@ -84,9 +90,9 @@ function SessionRow({ session, isActive, onSelect, onDelete, onRename }: Session
   const handleConfirmDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-    fetch(`${API_BASE}/sessions/${session.id}`, { method: "DELETE" }).then(
-      () => onDelete(session.id),
-    );
+    fetch(`${API_BASE}/sessions/${session.id}`, { method: "DELETE" }).then((r) => {
+      if (r.ok) onDelete(session.id);
+    });
   };
 
   const handleCancelDelete = (e: React.MouseEvent) => {
@@ -104,7 +110,11 @@ function SessionRow({ session, isActive, onSelect, onDelete, onRename }: Session
       }`}
       onClick={() => !editing && onSelect()}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setConfirmDelete(false); }}
+      onMouseLeave={() => {
+        setHovered(false);
+        if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+        setConfirmDelete(false);
+      }}
     >
       {editing ? (
         <input
