@@ -1,0 +1,26 @@
+clickhouse:
+  host: "10.161.111.100"
+  port: 9000
+  user: "sesslog"
+  password: "1"
+  database: "logdb"
+  connect_timeout: 30
+  query_timeout: 30
+  max_connections: 10
+
+llm:
+  base_url: "http://localhost:11434/v1"
+  api_key: "ollama"
+  model: "qwen2.5:72b"
+  temperature: 0.1
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+executor:
+  max_workers: 5
+  retry_time_shrink: 0.5
+
+cache:
+  ttl_seconds: 300
