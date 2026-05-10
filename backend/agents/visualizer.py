@@ -1,9 +1,13 @@
 import json
+import logging
+import time
 import pandas as pd
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from models.schemas import VizSpec
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _RENDERS_DIR = Path(__file__).parent.parent.parent / "data" / "renders"
 _RENDERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -92,15 +96,19 @@ chart.setOption({echarts_option});
 
 def run_visualizer(
     results: dict,
+    blueprints: list,
     session_id: str,
     message_id: str,
     llm=None,
 ) -> list:
-    llm = llm or _build_llm()
+    llm_instance = None  # 懒加载，仅在需要时初始化
+    blueprint_map = {bp.task_id: bp for bp in blueprints}
     outputs = []
 
+    logger.info("visualizer: start  tasks=%d  blueprints=%d", len(results), len(blueprints))
     for task_id, result in results.items():
         if result["status"] != "success":
+            logger.warning("visualizer: skip task=%s  status=%s", task_id, result["status"])
             outputs.append({
                 "render": "text",
                 "content": f"⚠️ {result['description']} 获取失败：{result.get('error', '未知错误')}"
@@ -112,29 +120,48 @@ def run_visualizer(
             outputs.append({"render": "text", "content": f"📭 {result['description']}：无数据"})
             continue
 
-        summary = _df_summary(df)
-        messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"任务：{result['description']}\n数据结构：{summary}"},
-        ]
-        response = llm.invoke(messages)
-        try:
-            spec = VizSpec(**json.loads(response.content))
-        except Exception:
+        blueprint = blueprint_map.get(task_id)
+        if blueprint:
+            logger.info("visualizer: task=%s  using blueprint  chart=%s", task_id, blueprint.chart_type)
             spec = VizSpec(
                 render_type="echarts",
-                chart_type="bar",
-                title=result["description"],
-                x_field=df.columns[0] if len(df.columns) > 0 else None,
-                y_field=df.columns[1] if len(df.columns) > 1 else None,
-                insight="",
+                chart_type=blueprint.chart_type,
+                title=blueprint.title,
+                x_field=blueprint.x_field,
+                y_field=blueprint.y_field,
+                insight=blueprint.insight_hint,
             )
-
-        if spec.render_type == "html":
-            path = _build_html(spec, df, session_id, f"{message_id}_{task_id}")
-            outputs.append({"render": "html", "content": path, "title": spec.title})
-        else:
             option = _build_echarts_option(spec, df)
-            outputs.append({"render": "echarts", "content": option, "insight": spec.insight})
+            outputs.append({"render": "echarts", "content": option, "insight": blueprint.insight_hint})
+        else:
+            logger.info("visualizer: task=%s  no blueprint, falling back to LLM", task_id)
+            if llm_instance is None:
+                llm_instance = llm or _build_llm()
+            summary = _df_summary(df)
+            messages = [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": f"任务：{result['description']}\n数据结构：{summary}"},
+            ]
+            t0 = time.perf_counter()
+            response = llm_instance.invoke(messages)
+            logger.info("visualizer: task=%s  LLM fallback done %.2fs", task_id, time.perf_counter() - t0)
+            try:
+                spec = VizSpec(**json.loads(response.content))
+            except Exception:
+                spec = VizSpec(
+                    render_type="echarts",
+                    chart_type="bar",
+                    title=result["description"],
+                    x_field=df.columns[0] if len(df.columns) > 0 else None,
+                    y_field=df.columns[1] if len(df.columns) > 1 else None,
+                    insight="",
+                )
+            if spec.render_type == "html":
+                path = _build_html(spec, df, session_id, f"{message_id}_{task_id}")
+                outputs.append({"render": "html", "content": path, "title": spec.title})
+            else:
+                option = _build_echarts_option(spec, df)
+                outputs.append({"render": "echarts", "content": option, "insight": spec.insight})
 
+    logger.info("visualizer: done  outputs=%d", len(outputs))
     return outputs
