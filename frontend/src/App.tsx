@@ -55,17 +55,11 @@ export default function App() {
   };
 
   const handleDeleteSession = (id: string) => {
-    setSessions((prev) => {
-      const remaining = prev.filter((s) => s.id !== id);
-      if (id === sessionId) {
-        if (remaining.length > 0) {
-          setSessionId(remaining[0].id);
-        } else {
-          setSessionId(uuidv4());
-        }
-      }
-      return remaining;
-    });
+    const remaining = sessions.filter((s) => s.id !== id);
+    setSessions(remaining);
+    if (id === sessionId) {
+      setSessionId(remaining.length > 0 ? remaining[0].id : uuidv4());
+    }
   };
 
   const handleRenameSession = (id: string, title: string) => {
