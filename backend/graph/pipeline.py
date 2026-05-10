@@ -12,6 +12,9 @@ from agents.sql_engineer import run_sql_engineer
 from agents.code_reviewer import run_code_reviewer
 from agents.script_runner import run_script_runner
 from agents.summarizer import run_summarizer
+from agents.intent_router import run_intent_router
+from agents.knowledge_agent import run_knowledge_agent, search_docs
+from agents.chitchat_agent import run_chitchat_agent
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,11 @@ class PipelineState(TypedDict):
     summary_report: Optional[SummaryReport]
     error: Optional[str]
     progress_cb: Optional[Callable[[str], None]]
+    intent: Optional[str]
+    rewritten_query: Optional[str]
+    intent_confidence: float
+    knowledge_answer: Optional[str]
+    chitchat_answer: Optional[str]
 
 
 def _emit(state: PipelineState, text: str) -> None:
@@ -69,6 +77,59 @@ def node_clarifier(state: PipelineState) -> dict:
             "clarifier_question": result.get("question", "请描述您的分析需求"),
             "clarifier_options": result.get("options", []),
         }
+
+
+def node_intent_router(state: PipelineState) -> dict:
+    sid = state["session_id"]
+    logger.info("[%s] >>> node:intent_router  input=%r", sid, state["user_message"][:80])
+    try:
+        result = run_intent_router(state["user_message"], state["conversation_history"])
+    except Exception as e:
+        logger.error("[%s] <<< node:intent_router  FAILED: %s", sid, e, exc_info=True)
+        return {"intent": "data_analysis", "rewritten_query": state["user_message"], "intent_confidence": 0.0}
+    logger.info("[%s] <<< node:intent_router  intent=%s  confidence=%.2f", sid, result["intent"], result["confidence"])
+    return {
+        "intent": result["intent"],
+        "rewritten_query": result["rewritten_query"],
+        "intent_confidence": result["confidence"],
+    }
+
+
+def node_knowledge_agent(state: PipelineState) -> dict:
+    sid = state["session_id"]
+    query = state.get("rewritten_query") or state["user_message"]
+    _emit(state, "🔍 正在检索相关文档...")
+    logger.info("[%s] >>> node:knowledge_agent  query=%r", sid, query[:80])
+    docs_context = search_docs(query)
+    try:
+        result = run_knowledge_agent(query, state["conversation_history"], docs_context=docs_context)
+    except Exception as e:
+        logger.error("[%s] <<< node:knowledge_agent  FAILED: %s", sid, e, exc_info=True)
+        return {"knowledge_answer": None, "error": str(e)}
+    if result["action"] == "ask":
+        logger.info("[%s] <<< node:knowledge_agent  action=ask", sid)
+        return {
+            "knowledge_answer": None,
+            "clarifier_done": False,
+            "clarifier_question": result["question"],
+            "clarifier_options": result.get("options", []),
+        }
+    answer = result.get("answer", "")
+    logger.info("[%s] <<< node:knowledge_agent  answer_len=%d", sid, len(answer))
+    return {"knowledge_answer": answer}
+
+
+def node_chitchat_agent(state: PipelineState) -> dict:
+    sid = state["session_id"]
+    query = state.get("rewritten_query") or state["user_message"]
+    logger.info("[%s] >>> node:chitchat_agent  input=%r", sid, query[:60])
+    try:
+        answer = run_chitchat_agent(query, state["conversation_history"])
+    except Exception as e:
+        logger.error("[%s] <<< node:chitchat_agent  FAILED: %s", sid, e, exc_info=True)
+        return {"chitchat_answer": "你好！有什么可以帮你的吗？"}
+    logger.info("[%s] <<< node:chitchat_agent  answer_len=%d", sid, len(answer))
+    return {"chitchat_answer": answer}
 
 
 def node_planner(state: PipelineState) -> dict:
@@ -232,6 +293,22 @@ def route_after_clarifier(state: PipelineState) -> str:
     return "planner" if state["clarifier_done"] else "end_clarify"
 
 
+def route_after_intent_router(state: PipelineState) -> str:
+    intent = state.get("intent", "unknown")
+    if intent == "knowledge_qa":
+        return "knowledge_agent"
+    elif intent == "chitchat":
+        return "chitchat_agent"
+    else:
+        return "clarifier"
+
+
+def route_after_knowledge_agent(state: PipelineState) -> str:
+    if not state.get("clarifier_done", True) and state.get("clarifier_question"):
+        return "end_clarify"
+    return "end"
+
+
 def route_after_planner(state: PipelineState) -> str:
     if _has_error(state):
         return "end"
@@ -265,6 +342,7 @@ def node_increment_retry(state: PipelineState) -> dict:
 
 def build_pipeline():
     graph = StateGraph(PipelineState)
+    graph.add_node("intent_router", node_intent_router)
     graph.add_node("clarifier", node_clarifier)
     graph.add_node("planner", node_planner)
     graph.add_node("sql_engineer", node_sql_engineer)
@@ -272,8 +350,15 @@ def build_pipeline():
     graph.add_node("code_reviewer", node_code_reviewer)
     graph.add_node("script_runner", node_script_runner)
     graph.add_node("summarizer", node_summarizer)
+    graph.add_node("knowledge_agent", node_knowledge_agent)
+    graph.add_node("chitchat_agent", node_chitchat_agent)
 
-    graph.set_entry_point("clarifier")
+    graph.set_entry_point("intent_router")
+    graph.add_conditional_edges("intent_router", route_after_intent_router, {
+        "clarifier": "clarifier",
+        "knowledge_agent": "knowledge_agent",
+        "chitchat_agent": "chitchat_agent",
+    })
     graph.add_conditional_edges("clarifier", route_after_clarifier, {
         "end_clarify": END,
         "planner": "planner",
@@ -298,5 +383,10 @@ def build_pipeline():
         "summarizer": "summarizer",
     })
     graph.add_edge("summarizer", END)
+    graph.add_conditional_edges("knowledge_agent", route_after_knowledge_agent, {
+        "end_clarify": END,
+        "end": END,
+    })
+    graph.add_edge("chitchat_agent", END)
 
     return graph.compile()
