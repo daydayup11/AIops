@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage, VizBlueprintItem, SummaryReportData } from "../types";
+import type { ChatMessage, SummaryReportData } from "../types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ProgressBar } from "./ProgressBar";
 import { ClarifyMessage } from "./ClarifyMessage";
-import { PlanCard } from "./PlanCard";
 import { SummaryReport } from "./SummaryReport";
 
 interface Props {
@@ -41,13 +40,6 @@ export function ChatPanel({ messages, onSend }: Props) {
               options={msg.options ?? []}
               onSelect={onSend}
             />
-          );
-        }
-        if (msg.type === "plan") {
-          return (
-            <div key={msg.id} className="flex justify-start">
-              <PlanCard items={msg.content as VizBlueprintItem[]} />
-            </div>
           );
         }
         if (msg.type === "result") {

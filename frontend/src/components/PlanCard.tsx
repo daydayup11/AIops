@@ -1,4 +1,11 @@
-import type { VizBlueprintItem } from "../types";
+interface VizBlueprintItem {
+  task_id: string;
+  chart_type: string;
+  title: string;
+  x_field: string;
+  y_field: string;
+  insight_hint: string;
+}
 
 const CHART_ICON: Record<string, string> = {
   bar: "📊",

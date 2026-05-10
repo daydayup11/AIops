@@ -1,5 +1,5 @@
 export type MessageType = "clarify" | "progress" | "result" | "plan" | "summary" | "error" | "done" | "user";
-export type RenderType = "echarts" | "html" | "table" | "text";
+export type RenderType = "image" | "text";
 
 export interface WSMessage {
   type: MessageType;
@@ -21,15 +21,6 @@ export interface ChatMessage {
   timestamp: number;
   question?: string;
   options?: string[];
-}
-
-export interface VizBlueprintItem {
-  task_id: string;
-  chart_type: string;
-  title: string;
-  x_field: string;
-  y_field: string;
-  insight_hint: string;
 }
 
 export interface SummaryReportData {
