@@ -1,12 +1,13 @@
 import ReactECharts from "echarts-for-react";
 import "../lib/echartsTheme";
+import type { Theme } from "../hooks/useTheme";
 
 interface Props {
   render: "echarts" | "html" | "table" | "text";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   insight?: string;
-  theme?: "light" | "tech";
+  theme?: Theme;
 }
 
 export function ChartRenderer({ render, content, insight, theme }: Props) {
@@ -19,6 +20,7 @@ export function ChartRenderer({ render, content, insight, theme }: Props) {
           </p>
         )}
         <ReactECharts
+          key={theme}
           option={content}
           theme={theme === "tech" ? "tech" : undefined}
           style={{ height: 350 }}

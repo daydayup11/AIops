@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../types";
+import type { Theme } from "../hooks/useTheme";
 import { ChartRenderer } from "./ChartRenderer";
 import { ProgressBar } from "./ProgressBar";
 
 interface Props {
   messages: ChatMessage[];
-  theme?: "light" | "tech";
+  theme?: Theme;
 }
 
 export function ChatPanel({ messages, theme }: Props) {

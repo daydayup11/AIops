@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-type Theme = "light" | "tech";
+export type Theme = "light" | "tech";
 
 const STORAGE_KEY = "app-theme";
 
@@ -15,7 +15,9 @@ function applyTheme(theme: Theme) {
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "tech" ? "tech" : "light";
+    const t: Theme = stored === "tech" ? "tech" : "light";
+    applyTheme(t);
+    return t;
   });
 
   useEffect(() => {
