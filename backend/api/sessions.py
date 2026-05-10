@@ -24,9 +24,6 @@ def list_sessions():
 
 @router.get("/sessions/{session_id}/messages")
 def list_messages(session_id: str):
-    sessions = get_sessions()
-    if not any(s["id"] == session_id for s in sessions):
-        raise HTTPException(status_code=404, detail="Session not found")
     return get_session_messages(session_id)
 
 

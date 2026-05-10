@@ -42,9 +42,10 @@ def test_get_session_messages(client):
     assert msgs[0]["content"] == "hi"
     assert "image_data" not in msgs[0]
 
-def test_get_session_messages_not_found(client):
+def test_get_session_messages_unknown_session_returns_empty(client):
     r = client.get("/api/v1/sessions/nonexistent/messages")
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json() == []
 
 def test_get_message_image(client):
     sid = db_module.create_session("s1")
