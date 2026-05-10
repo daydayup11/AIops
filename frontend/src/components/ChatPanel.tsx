@@ -1,15 +1,17 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage } from "../types";
-import type { Theme } from "../hooks/useTheme";
+import type { ChatMessage, VizBlueprintItem, SummaryReportData } from "../types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ProgressBar } from "./ProgressBar";
+import { ClarifyMessage } from "./ClarifyMessage";
+import { PlanCard } from "./PlanCard";
+import { SummaryReport } from "./SummaryReport";
 
 interface Props {
   messages: ChatMessage[];
-  theme?: Theme;
+  onSend: (text: string) => void;
 }
 
-export function ChatPanel({ messages, theme }: Props) {
+export function ChatPanel({ messages, onSend }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,10 +35,18 @@ export function ChatPanel({ messages, theme }: Props) {
         }
         if (msg.type === "clarify") {
           return (
+            <ClarifyMessage
+              key={msg.id}
+              question={msg.question ?? msg.content}
+              options={msg.options ?? []}
+              onSelect={onSend}
+            />
+          );
+        }
+        if (msg.type === "plan") {
+          return (
             <div key={msg.id} className="flex justify-start">
-              <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-lg text-sm text-[var(--color-foreground)] leading-relaxed shadow-sm">
-                {msg.content}
-              </div>
+              <PlanCard items={msg.content as VizBlueprintItem[]} />
             </div>
           );
         }
@@ -46,11 +56,14 @@ export function ChatPanel({ messages, theme }: Props) {
               key={msg.id}
               className="w-full bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-5 shadow-md"
             >
-              <ChartRenderer
-                render={msg.render!}
-                content={msg.content}
-                theme={theme}
-              />
+              <ChartRenderer render={msg.render!} content={msg.content} />
+            </div>
+          );
+        }
+        if (msg.type === "summary") {
+          return (
+            <div key={msg.id} className="w-full">
+              <SummaryReport report={msg.content as SummaryReportData} />
             </div>
           );
         }

@@ -82,7 +82,7 @@ export default function App() {
             onNew={handleNew}
           />
           <div className="flex flex-col flex-1 overflow-hidden">
-            <ChatPanel messages={messages} theme={theme} />
+            <ChatPanel messages={messages} onSend={sendMessage} />
             <InputBar onSend={sendMessage} disabled={isLoading} />
           </div>
         </div>
