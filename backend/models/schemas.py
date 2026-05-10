@@ -11,48 +11,33 @@ class WSIncoming(BaseModel):
 class WSMessage(BaseModel):
     type: Literal["clarify", "progress", "result", "plan", "summary", "error", "done"]
     content: Any
-    render: Optional[Literal["echarts", "html", "table", "text"]] = None
+    render: Optional[Literal["image", "text"]] = None
     elapsed: Optional[float] = None
 
 
-class SubTask(BaseModel):
-    id: str
-    description: str
-    tables: list[str]
-    time_range_hours: int = 24
-
-
-class VizBlueprint(BaseModel):
-    task_id: str
-    chart_type: str
-    title: str
-    x_field: str
-    y_field: str
-    insight_hint: str
+class AnalysisPlan(BaseModel):
+    goal: str
+    approach: str
+    expected_findings: list[str]
+    analysis_dimensions: list[str]
+    viz_intent: str
 
 
 class TaskPlan(BaseModel):
-    tasks: list[SubTask]
-    viz_blueprint: list[VizBlueprint] = Field(default_factory=list)
+    analysis_plan: Optional[AnalysisPlan] = None
     clarification_needed: bool = False
     clarification_question: Optional[str] = None
     estimated_seconds: int = 10
 
 
-class SQLTask(BaseModel):
-    task_id: str
-    sql: str
+class PyScript(BaseModel):
+    script_code: str
     description: str
 
 
-class VizSpec(BaseModel):
-    render_type: Literal["echarts", "html"]
-    chart_type: Optional[str] = None
-    title: str
-    x_field: Optional[str] = None
-    y_field: Optional[str] = None
-    series_field: Optional[str] = None
-    insight: str = ""
+class CodeReviewResult(BaseModel):
+    approved: bool
+    issues: list[str]
 
 
 class SummaryReport(BaseModel):
