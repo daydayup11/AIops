@@ -57,6 +57,7 @@ async def websocket_chat(ws: WebSocket):
             try:
                 result_state = get_pipeline().invoke(state)
             except Exception as e:
+                logger.error("Pipeline execution failed: %s", e, exc_info=True)
                 await ws.send_text(json.dumps({"type": "error", "content": str(e)}))
                 await ws.send_text(json.dumps({"type": "done", "content": ""}))
                 continue
