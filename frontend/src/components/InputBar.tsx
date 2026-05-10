@@ -28,7 +28,7 @@ export function InputBar({ onSend, disabled }: Props) {
     <div className="flex gap-2 px-5 py-4 border-t bg-[var(--color-card)] items-center">
       <div className="relative flex-1">
         <Input
-          className="pr-16 h-10 text-sm"
+          className={`h-10 text-sm ${!value ? "pr-16" : ""}`}
           placeholder="输入分析问题，例如：分析昨天各出口线路的流量分布"
           value={value}
           onChange={(e) => setValue(e.target.value)}
