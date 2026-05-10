@@ -4,6 +4,7 @@ from logger import setup_logging
 from db.sqlite import init_db
 from api.chat import router as chat_router
 from api.health import router as health_router
+from api.sessions import router as sessions_router
 
 setup_logging()
 
@@ -20,3 +21,4 @@ init_db()
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(sessions_router, prefix="/api/v1")
