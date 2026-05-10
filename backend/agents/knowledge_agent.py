@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from config import settings
 
@@ -49,7 +50,7 @@ def search_docs(query: str, docs_dir: str = _DOCS_DIR) -> list[str]:
 def run_knowledge_agent(
     query: str,
     conversation_history: list,
-    docs_context: list[str] | None = None,
+    docs_context: Optional[List[str]] = None,
     llm=None,
 ) -> dict:
     llm = llm or _build_llm()
