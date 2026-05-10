@@ -1,68 +1,70 @@
-import json
 import logging
-import re
+import time
+from typing import Optional
 from langchain_openai import ChatOpenAI
-from models.schemas import SubTask, SQLTask
+from models.schemas import TaskPlan, PyScript
 from db.schema import TABLE_SCHEMA
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_BIG_TABLES = {"sessions", "npm", "dns", "url"}
-_TIME_FIELDS = {
-    "sessions": "start",
-    "npm": "start",
-    "dns": "collect_time",
-    "url": "collect_time",
-    "iplog": "collect_time",
-    "wanlog": "collect_time",
-    "applog": "collect_time",
-    "event": "collect_time",
-    "usrauth": "collect_time",
-}
-
-_SYSTEM_PROMPT = f"""你是SQL生成专家，为校园网ClickHouse数据库生成查询SQL。
+_SYSTEM_PROMPT = f"""你是校园网流量分析的Python脚本生成专家。
 
 {TABLE_SCHEMA}
 
-返回严格JSON数组（不要Markdown代码块）：
-[{{"task_id":"t1","sql":"SELECT ...","description":"说明"}}]
+你的任务：根据分析方案，生成一个完整的Python脚本。
 
-规则：
-1. 只生成SELECT语句
-2. 必须包含时间条件（sessions/npm用start，其余用collect_time）
-3. 大表加LIMIT 10000
-4. 使用ClickHouse语法（now(), INTERVAL 1 DAY, toDate()等）
+## 脚本要求
+
+1. **数据库连接**：通过环境变量获取参数：
+   ```python
+   import os
+   from clickhouse_driver import Client
+   client = Client(
+       host=os.environ['CH_HOST'],
+       port=int(os.environ['CH_PORT']),
+       user=os.environ['CH_USER'],
+       password=os.environ['CH_PASSWORD'],
+       database=os.environ['CH_DATABASE'],
+   )
+   ```
+
+2. **SQL规则**（违反会导致查询失败）：
+   - 只用SELECT，必须带时间条件（sessions/npm用start，其余用collect_time）
+   - 大表（sessions/npm/dns/url）必须加LIMIT
+   - 禁止大表相互JOIN
+   - 使用ClickHouse语法（now(), INTERVAL 1 DAY等）
+
+3. **图片输出**：
+   ```python
+   output_dir = os.environ['OUTPUT_DIR']
+   plt.savefig(os.path.join(output_dir, '01_图表名.png'), dpi=100, bbox_inches='tight')
+   plt.close()
+   ```
+   - 文件名用数字前缀排序（01_, 02_）
+   - 只能写入 OUTPUT_DIR，不能写其他路径
+   - 使用matplotlib/seaborn，设置中文字体：`plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']`
+
+4. **错误处理**：每个查询用try/except，失败时打印错误并继续下一个图
+
+5. **超时意识**：
+   - 查询大表时带时间窗口，避免全表扫描
+   - 复杂聚合用LIMIT控制结果集
+   - 整个脚本须在60秒内完成
+
+## 输出
+
+直接输出Python脚本代码，不要任何说明文字，不要Markdown代码块。
 """
 
+_RETRY_SUFFIX = """
 
-def ensure_time_condition(sql: str, primary_table: str) -> str:
-    time_field = _TIME_FIELDS.get(primary_table, "collect_time")
-    if re.search(r'\b(start|collect_time)\b', sql, re.IGNORECASE):
-        return sql
-    where_match = re.search(r'\bWHERE\b', sql, re.IGNORECASE)
-    if where_match:
-        pos = where_match.end()
-        return sql[:pos] + f" {time_field} >= now()-INTERVAL 1 DAY AND" + sql[pos:]
-    from_match = re.search(r'\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b', sql, re.IGNORECASE)
-    if from_match:
-        pos = from_match.start()
-        return sql[:pos] + f" WHERE {time_field} >= now()-INTERVAL 1 DAY " + sql[pos:]
-    return sql + f" WHERE {time_field} >= now()-INTERVAL 1 DAY"
+## 上次代码审查发现的问题，请修复：
 
+{issues}
 
-def ensure_limit(sql: str, limit: int = 10000) -> str:
-    if re.search(r'\bLIMIT\b', sql, re.IGNORECASE):
-        return sql
-    return sql.rstrip(";") + f" LIMIT {limit}"
-
-
-def optimize_sql(sql: str, tables: list) -> str:
-    primary = tables[0] if tables else "sessions"
-    sql = ensure_time_condition(sql, primary)
-    if any(t in _BIG_TABLES for t in tables):
-        sql = ensure_limit(sql)
-    return sql
+请生成修复后的完整脚本。
+"""
 
 
 def _build_llm() -> ChatOpenAI:
@@ -75,33 +77,43 @@ def _build_llm() -> ChatOpenAI:
     )
 
 
-def run_sql_engineer(tasks: list, llm=None) -> list:
+def run_sql_engineer(
+    task_plan: TaskPlan,
+    issues: Optional[list[str]] = None,
+    llm=None,
+) -> Optional[PyScript]:
     llm = llm or _build_llm()
-    task_desc = "\n".join(
-        f"- id={t.id}: {t.description}，涉及表：{', '.join(t.tables)}, 时间范围：{t.time_range_hours}小时"
-        for t in tasks
-    )
+    ap = task_plan.analysis_plan
+
+    user_content = f"""分析目标：{ap.goal}
+分析思路：{ap.approach}
+分析维度：{', '.join(ap.analysis_dimensions)}
+预期发现：{', '.join(ap.expected_findings)}
+可视化意图：{ap.viz_intent}"""
+
+    if issues:
+        user_content += _RETRY_SUFFIX.format(issues='\n'.join(f'- {i}' for i in issues))
+
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": f"为以下子任务生成SQL：\n{task_desc}"},
+        {"role": "user", "content": user_content},
     ]
+
+    logger.info("sql_engineer: LLM call start  retry_issues=%d", len(issues) if issues else 0)
+    t0 = time.perf_counter()
     try:
         response = llm.invoke(messages)
     except Exception:
-        logger.error("LLM call failed in sql_engineer", exc_info=True)
-        return []
+        logger.error("sql_engineer: LLM call failed (%.2fs)", time.perf_counter() - t0, exc_info=True)
+        return None
+    elapsed = time.perf_counter() - t0
+    logger.info("sql_engineer: done %.2fs  script_len=%d", elapsed, len(response.content))
 
-    logger.debug("SQL engineer raw LLM response: %s", response.content[:500])
-    try:
-        data = json.loads(response.content)
-        result = []
-        task_map = {t.id: t for t in tasks}
-        for item in data:
-            matched_task = task_map.get(item["task_id"], tasks[0])
-            sql = optimize_sql(item["sql"], matched_task.tables)
-            result.append(SQLTask(task_id=item["task_id"], sql=sql, description=item["description"]))
-        logger.info("SQL tasks generated: %d", len(result))
-        return result
-    except Exception:
-        logger.warning("SQL engineer JSON parse failed, returning empty list", exc_info=True)
-        return []
+    script_code = response.content.strip()
+    # Strip markdown code fences if LLM adds them despite instructions
+    if script_code.startswith("```"):
+        lines = script_code.split('\n')
+        script_code = '\n'.join(lines[1:-1] if lines[-1].strip() == '```' else lines[1:])
+
+    description = ap.goal
+    return PyScript(script_code=script_code, description=description)
