@@ -1,0 +1,46 @@
+<h2>实现方案对比</h2>
+<p class="subtitle">三种主题切换架构，选择最适合项目现状的方案</p>
+
+<div class="options" style="flex-direction: column; gap: 16px; margin-top: 20px;">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>CSS 变量切换（推荐）</h3>
+      <p>在 <code>index.css</code> 里定义两套 CSS 变量，给 <code>&lt;html&gt;</code> 加 <code>data-theme="tech"</code> 属性即可全局切换。React 中用一个 <code>useTheme</code> hook 管理状态并持久化到 <code>localStorage</code>。ECharts 注册自定义 theme JSON，在 theme 变化时传给 ReactECharts 的 <code>theme</code> prop。</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>优点</h4><ul><li>改动最小，全量替换 CSS 变量即可</li><li>无运行时计算，切换瞬间完成</li><li>与现有 Tailwind CSS 变量体系完全兼容</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要在 ECharts 上额外注册 theme JSON</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tailwind dark: 类切换</h3>
+      <p>利用 Tailwind v4 的 <code>dark:</code> variant，在 <code>&lt;html&gt;</code> 上加/去 <code>dark</code> class。所有组件的暗色样式用 <code>dark:bg-xxx</code> 写在 JSX 里。</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>优点</h4><ul><li>标准 Tailwind 方案，工具链支持好</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要在每个组件里加大量 dark: 类，改动面广</li><li>科技风不等于普通暗色，表现力受限</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>主题 Context + 动态 className</h3>
+      <p>用 React Context 传递 theme 值，每个组件根据 theme 拼接不同 className 字符串。</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>优点</h4><ul><li>每个组件可完全自定义两套样式</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>改动量最大，每个组件都要改</li><li>维护两套样式字符串容易出错</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top: 20px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 16px;">
+  <p style="font-size: 13px; color: #888; margin: 0;"><strong>推荐 A</strong>：项目已经在用 CSS 变量体系（<code>--color-background</code> 等），加一套 tech 变量是最小改动路径，且与 Tailwind v4 的 @theme 完全兼容。</p>
+</div>
