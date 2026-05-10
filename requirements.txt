@@ -2,7 +2,6 @@ aiosqlite==0.22.1
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1
-backports.asyncio.runner==1.2.0
 cachetools==6.2.6
 certifi==2026.4.22
 charset-normalizer==3.4.7
@@ -27,7 +26,9 @@ langgraph-checkpoint==2.1.2
 langgraph-prebuilt==0.6.5
 langgraph-sdk==0.2.9
 langsmith==0.4.37
+matplotlib>=3.8.0
 numpy==2.0.2
+seaborn>=0.13.0
 openai==2.36.0
 orjson==3.11.5
 ormsgpack==1.11.0
@@ -38,7 +39,7 @@ pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
 pytest==8.4.2
-pytest-asyncio==1.2.0
+pytest-asyncio==0.23.8
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 pytz==2026.2
