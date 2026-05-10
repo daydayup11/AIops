@@ -1,0 +1,78 @@
+import base64
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+from models.schemas import PyScript
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_TIMEOUT = 60
+_cfg = settings["clickhouse"]
+
+
+def run_script_runner(
+    py_script: PyScript,
+    timeout: int = _DEFAULT_TIMEOUT,
+) -> list:
+    with tempfile.TemporaryDirectory(prefix="aiops_renders_") as output_dir:
+        env = os.environ.copy()
+        env.update({
+            "CH_HOST": str(_cfg["host"]),
+            "CH_PORT": str(_cfg["port"]),
+            "CH_USER": str(_cfg["user"]),
+            "CH_PASSWORD": str(_cfg["password"]),
+            "CH_DATABASE": str(_cfg["database"]),
+            "OUTPUT_DIR": output_dir,
+            "MPLBACKEND": "Agg",
+        })
+
+        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as f:
+            f.write(py_script.script_code)
+            script_path = f.name
+
+        try:
+            logger.info("script_runner: executing script  len=%d  timeout=%ds",
+                        len(py_script.script_code), timeout)
+            t0 = time.perf_counter()
+            proc = subprocess.run(
+                [sys.executable, script_path],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            elapsed = time.perf_counter() - t0
+            logger.info("script_runner: done  %.2fs  returncode=%d", elapsed, proc.returncode)
+
+            if proc.returncode != 0:
+                err = proc.stderr[-500:] if proc.stderr else "脚本执行失败"
+                logger.warning("script_runner: script failed\n%s", proc.stderr)
+                return [{"render": "text", "content": f"⚠️ 脚本执行错误：{err}"}]
+
+            png_files = sorted(Path(output_dir).glob("*.png"))
+            logger.info("script_runner: found %d PNG files", len(png_files))
+
+            if not png_files:
+                return [{"render": "text", "content": "⚠️ 脚本执行完成但未生成图表，请重试"}]
+
+            outputs = []
+            for png_path in png_files:
+                data = png_path.read_bytes()
+                b64 = base64.b64encode(data).decode("ascii")
+                outputs.append({"render": "image", "content": b64})
+            return outputs
+
+        except subprocess.TimeoutExpired:
+            logger.warning("script_runner: timeout after %ds", timeout)
+            return [{"render": "text", "content": f"⚠️ 脚本执行超时（>{timeout}秒），请简化查询后重试"}]
+        finally:
+            try:
+                os.unlink(script_path)
+            except OSError:
+                pass
