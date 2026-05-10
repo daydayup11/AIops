@@ -1,5 +1,7 @@
+import type { RenderType } from "../types";
+
 interface Props {
-  render: "image" | "text";
+  render: RenderType;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
 }

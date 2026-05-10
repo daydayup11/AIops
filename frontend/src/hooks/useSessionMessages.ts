@@ -28,6 +28,10 @@ function rowToChatMessage(row: HistoryRow): ChatMessage {
   if (row.role === "user") {
     return { ...base, type: "user" };
   }
+  // assistant text results stored with type="text" need render:"text" to display in ChatPanel
+  if (row.role === "assistant" && row.type === "text") {
+    return { ...base, type: "result", render: "text" };
+  }
   return base;
 }
 
