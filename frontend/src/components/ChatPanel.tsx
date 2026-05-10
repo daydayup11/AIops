@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ProgressBar } from "./ProgressBar";
@@ -7,16 +8,21 @@ interface Props {
 }
 
 export function ChatPanel({ messages }: Props) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   return (
-    <div className="flex flex-col gap-3 p-4 overflow-y-auto flex-1">
+    <div className="flex flex-col gap-4 p-5 overflow-y-auto flex-1 bg-[var(--color-background)]">
       {messages.map((msg) => {
         if (msg.type === "user") {
           return (
-            <div
-              key={msg.id}
-              className="self-end bg-blue-500 text-white rounded-lg px-4 py-2 max-w-lg"
-            >
-              {msg.content}
+            <div key={msg.id} className="flex justify-end">
+              <div className="bg-[var(--color-primary)] text-[var(--color-primary-foreground)] rounded-2xl rounded-br-sm px-4 py-2.5 max-w-lg text-sm leading-relaxed shadow-sm">
+                {msg.content}
+              </div>
             </div>
           );
         }
@@ -25,11 +31,10 @@ export function ChatPanel({ messages }: Props) {
         }
         if (msg.type === "clarify") {
           return (
-            <div
-              key={msg.id}
-              className="self-start bg-gray-100 rounded-lg px-4 py-2 max-w-lg text-gray-800"
-            >
-              {msg.content}
+            <div key={msg.id} className="flex justify-start">
+              <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-lg text-sm text-[var(--color-foreground)] leading-relaxed shadow-sm">
+                {msg.content}
+              </div>
             </div>
           );
         }
@@ -37,7 +42,7 @@ export function ChatPanel({ messages }: Props) {
           return (
             <div
               key={msg.id}
-              className="w-full bg-white border rounded-lg p-4 shadow-sm"
+              className="w-full bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-5 shadow-md"
             >
               <ChartRenderer render={msg.render!} content={msg.content} />
             </div>
@@ -47,7 +52,7 @@ export function ChatPanel({ messages }: Props) {
           return (
             <div
               key={msg.id}
-              className="text-red-500 text-sm px-4 py-2 bg-red-50 rounded"
+              className="text-[var(--color-destructive)] text-sm px-4 py-2.5 bg-[var(--color-destructive)]/10 border border-[var(--color-destructive)]/20 rounded-lg"
             >
               {msg.content}
             </div>
@@ -55,6 +60,7 @@ export function ChatPanel({ messages }: Props) {
         }
         return null;
       })}
+      <div ref={bottomRef} />
     </div>
   );
 }
