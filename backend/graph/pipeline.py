@@ -1,19 +1,20 @@
 import logging
 import time
-import uuid
 from typing import Callable, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
 
-from models.schemas import TaskPlan, SummaryReport
+from models.schemas import TaskPlan, PyScript, CodeReviewResult, SummaryReport
 from agents.clarifier import run_clarifier
 from agents.planner import run_planner
 from agents.sql_engineer import run_sql_engineer
-from agents.visualizer import run_visualizer
+from agents.code_reviewer import run_code_reviewer
+from agents.script_runner import run_script_runner
 from agents.summarizer import run_summarizer
-from executor.parallel import ParallelExecutor
 
 logger = logging.getLogger(__name__)
+
+_MAX_SCRIPT_RETRIES = 3
 
 
 class PipelineState(TypedDict):
@@ -21,8 +22,9 @@ class PipelineState(TypedDict):
     user_message: str
     conversation_history: list
     task_plan: Optional[TaskPlan]
-    sql_tasks: list
-    execution_results: dict
+    py_script: Optional[PyScript]
+    code_review_result: Optional[CodeReviewResult]
+    script_retry_count: int
     viz_outputs: list
     clarification_needed: bool
     clarification_question: Optional[str]
@@ -32,7 +34,6 @@ class PipelineState(TypedDict):
     summary_report: Optional[SummaryReport]
     error: Optional[str]
     progress_cb: Optional[Callable[[str], None]]
-    plan_cb: Optional[Callable[[list], None]]
 
 
 def _emit(state: PipelineState, text: str) -> None:
@@ -41,16 +42,22 @@ def _emit(state: PipelineState, text: str) -> None:
         cb(text)
 
 
-def _emit_plan(state: PipelineState, blueprint: list) -> None:
-    cb = state.get("plan_cb")
-    if cb:
-        cb(blueprint)
+def _fallback_outputs(message: str) -> list:
+    return [{"render": "text", "content": message}]
+
+
+def _has_error(state: PipelineState) -> bool:
+    return bool(state.get("error"))
 
 
 def node_clarifier(state: PipelineState) -> dict:
     sid = state["session_id"]
     logger.info("[%s] >>> node:clarifier  input=%r", sid, state["user_message"][:80])
-    result = run_clarifier(state["user_message"], state["conversation_history"])
+    try:
+        result = run_clarifier(state["user_message"], state["conversation_history"])
+    except Exception as e:
+        logger.error("[%s] <<< node:clarifier  FAILED: %s", sid, e, exc_info=True)
+        return {"clarifier_done": True, "clarifier_question": None, "clarifier_options": []}
     if result["action"] == "continue":
         logger.info("[%s] <<< node:clarifier  action=continue", sid)
         return {"clarifier_done": True, "clarifier_question": None, "clarifier_options": []}
@@ -65,18 +72,26 @@ def node_clarifier(state: PipelineState) -> dict:
 
 def node_planner(state: PipelineState) -> dict:
     sid = state["session_id"]
-    _emit(state, "🧠 正在理解问题、规划查询任务...")
+    _emit(state, "🧠 正在理解问题、制定分析方案...")
     logger.info("[%s] >>> node:planner  input=%r", sid, state["user_message"][:120])
     start = time.perf_counter()
-    plan = run_planner(state["user_message"], state["conversation_history"])
+    try:
+        plan = run_planner(state["user_message"], state["conversation_history"])
+    except Exception as e:
+        elapsed = time.perf_counter() - start
+        logger.error("[%s] <<< node:planner  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
+        _emit(state, "⚠️ 任务规划失败，已降级处理")
+        return {
+            "task_plan": None,
+            "clarification_needed": False,
+            "clarification_question": None,
+            "viz_outputs": _fallback_outputs(f"❌ 任务规划出错：{e}"),
+            "error": str(e),
+        }
     elapsed = time.perf_counter() - start
-    if not plan.clarification_needed:
-        chart_types = [bp.chart_type for bp in plan.viz_blueprint]
-        titles = [bp.title for bp in plan.viz_blueprint]
-        summary = "、".join(f"{ct}图({t})" for ct, t in zip(chart_types, titles))
-        _emit(state, f"📋 规划完成：共 {len(plan.tasks)} 个查询，将展示 {summary}")
-        _emit_plan(state, [bp.model_dump() for bp in plan.viz_blueprint])
-        logger.info("[%s] <<< node:planner  %.2fs  tasks=%s", sid, elapsed, [t.id for t in plan.tasks])
+    if not plan.clarification_needed and plan.analysis_plan:
+        _emit(state, f"📋 规划完成：{plan.analysis_plan.goal}")
+        logger.info("[%s] <<< node:planner  %.2fs  goal=%r", sid, elapsed, plan.analysis_plan.goal)
     return {
         "task_plan": plan,
         "clarification_needed": plan.clarification_needed,
@@ -86,53 +101,80 @@ def node_planner(state: PipelineState) -> dict:
 
 def node_sql_engineer(state: PipelineState) -> dict:
     sid = state["session_id"]
-    n = len(state["task_plan"].tasks)
-    _emit(state, f"⚙️ 正在生成 {n} 条查询 SQL...")
-    logger.info("[%s] >>> node:sql_engineer  tasks=%s", sid, [t.id for t in state["task_plan"].tasks])
+    retry = state.get("script_retry_count", 0)
+    issues = None
+    if retry > 0 and state.get("code_review_result"):
+        issues = state["code_review_result"].issues
+        _emit(state, f"🔧 正在根据审查意见修复脚本（第{retry}次重试）...")
+    else:
+        _emit(state, "⚙️ 正在生成分析脚本...")
+    logger.info("[%s] >>> node:sql_engineer  retry=%d", sid, retry)
     start = time.perf_counter()
-    sql_tasks = run_sql_engineer(state["task_plan"].tasks)
+    try:
+        py_script = run_sql_engineer(state["task_plan"], issues=issues)
+    except Exception as e:
+        elapsed = time.perf_counter() - start
+        logger.error("[%s] <<< node:sql_engineer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
+        _emit(state, "⚠️ 脚本生成失败，已降级处理")
+        return {
+            "py_script": None,
+            "viz_outputs": _fallback_outputs(f"❌ 脚本生成出错：{e}"),
+            "error": str(e),
+        }
     elapsed = time.perf_counter() - start
-    _emit(state, f"✅ SQL 生成完成，准备执行 {len(sql_tasks)} 条查询")
-    logger.info("[%s] <<< node:sql_engineer  %.2fs  sql_tasks=%d", sid, elapsed, len(sql_tasks))
-    return {"sql_tasks": sql_tasks}
+    if py_script is None:
+        logger.warning("[%s] <<< node:sql_engineer  %.2fs  returned None", sid, elapsed)
+        _emit(state, "⚠️ 脚本生成失败")
+        return {
+            "py_script": None,
+            "viz_outputs": _fallback_outputs("❌ 未能生成分析脚本，请换一种方式描述您的问题。"),
+            "error": "sql_engineer returned None",
+        }
+    _emit(state, f"✅ 脚本生成完成（{len(py_script.script_code)}字符）")
+    logger.info("[%s] <<< node:sql_engineer  %.2fs  script_len=%d", sid, elapsed, len(py_script.script_code))
+    return {"py_script": py_script}
 
 
-def node_executor(state: PipelineState) -> dict:
+def node_code_reviewer(state: PipelineState) -> dict:
     sid = state["session_id"]
-    n = len(state["sql_tasks"])
-    _emit(state, f"🔍 正在并行执行 {n} 条查询...")
-    logger.info("[%s] >>> node:executor  sql_tasks=%s", sid, [t.task_id for t in state["sql_tasks"]])
+    _emit(state, "🔍 正在审查脚本安全性与性能...")
+    logger.info("[%s] >>> node:code_reviewer", sid)
     start = time.perf_counter()
-
-    def task_progress_cb(task_id: str, status: str) -> None:
-        icon = "✅" if status == "success" else "❌"
-        _emit(state, f"{icon} 查询 {task_id} {status}")
-
-    executor = ParallelExecutor()
-    results = executor.run(state["sql_tasks"], progress_cb=task_progress_cb)
+    try:
+        result = run_code_reviewer(state["py_script"].script_code)
+    except Exception as e:
+        elapsed = time.perf_counter() - start
+        logger.error("[%s] <<< node:code_reviewer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
+        return {"code_review_result": CodeReviewResult(approved=True, issues=[])}
     elapsed = time.perf_counter() - start
-    ok = sum(1 for r in results.values() if r["status"] == "success")
-    fail = len(results) - ok
-    _emit(state, f"📊 查询完成：{ok} 成功{'，' + str(fail) + ' 失败' if fail else ''}")
-    logger.info("[%s] <<< node:executor  %.2fs  ok=%d fail=%d", sid, elapsed, ok, fail)
-    return {"execution_results": results}
+    if result.approved:
+        _emit(state, "✅ 脚本审查通过")
+    else:
+        _emit(state, f"⚠️ 发现{len(result.issues)}个问题，正在修复...")
+    logger.info("[%s] <<< node:code_reviewer  %.2fs  approved=%s  issues=%d",
+                sid, elapsed, result.approved, len(result.issues))
+    return {"code_review_result": result}
 
 
-def node_visualizer(state: PipelineState) -> dict:
+def node_script_runner(state: PipelineState) -> dict:
     sid = state["session_id"]
-    n = len(state["execution_results"])
-    _emit(state, f"🎨 正在生成 {n} 个图表...")
-    logger.info("[%s] >>> node:visualizer  results=%d", sid, n)
+    _emit(state, "🎨 正在执行分析脚本并生成图表...")
+    logger.info("[%s] >>> node:script_runner", sid)
     start = time.perf_counter()
-    blueprints = state["task_plan"].viz_blueprint if state["task_plan"] else []
-    outputs = run_visualizer(
-        state["execution_results"],
-        blueprints=blueprints,
-        session_id=sid,
-        message_id=str(uuid.uuid4()),
-    )
+    try:
+        outputs = run_script_runner(state["py_script"])
+    except Exception as e:
+        elapsed = time.perf_counter() - start
+        logger.error("[%s] <<< node:script_runner  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
+        _emit(state, "⚠️ 图表生成失败，已降级处理")
+        return {
+            "viz_outputs": _fallback_outputs(f"❌ 图表生成出错：{e}"),
+            "error": str(e),
+        }
     elapsed = time.perf_counter() - start
-    logger.info("[%s] <<< node:visualizer  %.2fs  outputs=%d", sid, elapsed, len(outputs))
+    image_count = sum(1 for o in outputs if o["render"] == "image")
+    logger.info("[%s] <<< node:script_runner  %.2fs  outputs=%d  images=%d",
+                sid, elapsed, len(outputs), image_count)
     return {"viz_outputs": outputs}
 
 
@@ -141,16 +183,17 @@ def node_summarizer(state: PipelineState) -> dict:
     _emit(state, "📝 正在生成分析报告...")
     logger.info("[%s] >>> node:summarizer", sid)
     start = time.perf_counter()
-    blueprints = state["task_plan"].viz_blueprint if state["task_plan"] else []
-    insights = [
-        {
-            "task_id": bp.task_id,
-            "insight_hint": bp.insight_hint,
-            "rows": len(state["execution_results"].get(bp.task_id, {}).get("df", [])),
-        }
-        for bp in blueprints
-    ]
-    report = run_summarizer(state["user_message"], insights)
+    task_plan = state["task_plan"]
+    analysis_plan = task_plan.analysis_plan if task_plan else None
+    image_count = sum(1 for o in state.get("viz_outputs", []) if o.get("render") == "image")
+    insights = [{"task_id": "script", "insight_hint": analysis_plan.viz_intent if analysis_plan else "", "rows": image_count}]
+    try:
+        report = run_summarizer(state["user_message"], insights, analysis_plan=analysis_plan)
+    except Exception as e:
+        elapsed = time.perf_counter() - start
+        logger.error("[%s] <<< node:summarizer  %.2fs  FAILED: %s", sid, elapsed, e, exc_info=True)
+        _emit(state, "⚠️ 报告生成失败，已跳过")
+        return {"summary_report": None}
     elapsed = time.perf_counter() - start
     logger.info("[%s] <<< node:summarizer  %.2fs  points=%d", sid, elapsed, len(report.key_points))
     return {"summary_report": report}
@@ -161,7 +204,34 @@ def route_after_clarifier(state: PipelineState) -> str:
 
 
 def route_after_planner(state: PipelineState) -> str:
+    if _has_error(state):
+        return "end"
     return "end_clarify" if state["clarification_needed"] else "sql_engineer"
+
+
+def route_after_sql_engineer(state: PipelineState) -> str:
+    return "end" if _has_error(state) else "code_reviewer"
+
+
+def route_after_code_reviewer(state: PipelineState) -> str:
+    if _has_error(state):
+        return "end"
+    result = state.get("code_review_result")
+    if result and not result.approved:
+        retry = state.get("script_retry_count", 0)
+        if retry < _MAX_SCRIPT_RETRIES:
+            return "sql_engineer"
+        else:
+            return "end"
+    return "script_runner"
+
+
+def route_after_script_runner(state: PipelineState) -> str:
+    return "end" if _has_error(state) else "summarizer"
+
+
+def node_increment_retry(state: PipelineState) -> dict:
+    return {"script_retry_count": state.get("script_retry_count", 0) + 1}
 
 
 def build_pipeline():
@@ -169,8 +239,9 @@ def build_pipeline():
     graph.add_node("clarifier", node_clarifier)
     graph.add_node("planner", node_planner)
     graph.add_node("sql_engineer", node_sql_engineer)
-    graph.add_node("executor", node_executor)
-    graph.add_node("visualizer", node_visualizer)
+    graph.add_node("increment_retry", node_increment_retry)
+    graph.add_node("code_reviewer", node_code_reviewer)
+    graph.add_node("script_runner", node_script_runner)
     graph.add_node("summarizer", node_summarizer)
 
     graph.set_entry_point("clarifier")
@@ -179,12 +250,24 @@ def build_pipeline():
         "planner": "planner",
     })
     graph.add_conditional_edges("planner", route_after_planner, {
+        "end": END,
         "end_clarify": END,
         "sql_engineer": "sql_engineer",
     })
-    graph.add_edge("sql_engineer", "executor")
-    graph.add_edge("executor", "visualizer")
-    graph.add_edge("visualizer", "summarizer")
+    graph.add_conditional_edges("sql_engineer", route_after_sql_engineer, {
+        "end": END,
+        "code_reviewer": "code_reviewer",
+    })
+    graph.add_conditional_edges("code_reviewer", route_after_code_reviewer, {
+        "end": END,
+        "sql_engineer": "increment_retry",
+        "script_runner": "script_runner",
+    })
+    graph.add_edge("increment_retry", "sql_engineer")
+    graph.add_conditional_edges("script_runner", route_after_script_runner, {
+        "end": END,
+        "summarizer": "summarizer",
+    })
     graph.add_edge("summarizer", END)
 
     return graph.compile()

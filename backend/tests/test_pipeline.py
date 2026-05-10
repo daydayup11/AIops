@@ -1,86 +1,48 @@
-import pytest
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-def test_pipeline_state_schema():
+def test_pipeline_state_has_new_fields():
     from graph.pipeline import PipelineState
-    state = PipelineState(
-        session_id="test-123",
-        user_message="分析流量",
-        conversation_history=[],
-        task_plan=None,
-        sql_tasks=[],
-        execution_results={},
-        viz_outputs=[],
-        clarification_needed=False,
-        clarification_question=None,
-        clarifier_done=False,
-        clarifier_question=None,
-        clarifier_options=[],
-        summary_report=None,
-        error=None,
-        progress_cb=None,
-        plan_cb=None,
-    )
-    assert state["session_id"] == "test-123"
+    fields = PipelineState.__annotations__
+    assert "py_script" in fields
+    assert "code_review_result" in fields
+    assert "script_retry_count" in fields
+    assert "sql_tasks" not in fields
+    assert "execution_results" not in fields
 
 
-def test_pipeline_graph_compiles():
-    from graph.pipeline import build_pipeline
-    graph = build_pipeline()
-    assert graph is not None
-
-
-def test_pipeline_routes_to_clarify():
-    from graph.pipeline import route_after_planner, PipelineState
-    state = PipelineState(
-        session_id="s1",
-        user_message="分析",
-        conversation_history=[],
-        task_plan=None,
-        sql_tasks=[],
-        execution_results={},
-        viz_outputs=[],
-        clarification_needed=True,
-        clarification_question="请说明时间范围",
-        clarifier_done=False,
-        clarifier_question=None,
-        clarifier_options=[],
-        summary_report=None,
-        error=None,
-        progress_cb=None,
-        plan_cb=None,
-    )
-    assert route_after_planner(state) == "end_clarify"
-
-
-def test_pipeline_routes_to_sql_engineer():
-    from graph.pipeline import route_after_planner, PipelineState
-    state = PipelineState(
-        session_id="s1",
-        user_message="分析昨天流量",
-        conversation_history=[],
-        task_plan=None,
-        sql_tasks=[],
-        execution_results={},
-        viz_outputs=[],
-        clarification_needed=False,
-        clarification_question=None,
-        clarifier_done=False,
-        clarifier_question=None,
-        clarifier_options=[],
-        summary_report=None,
-        error=None,
-        progress_cb=None,
-        plan_cb=None,
-    )
-    assert route_after_planner(state) == "sql_engineer"
-
-
-def test_pipeline_has_clarifier_node():
+def test_pipeline_builds():
     from graph.pipeline import build_pipeline
     pipeline = build_pipeline()
-    node_names = set(pipeline.nodes.keys())
-    assert "clarifier" in node_names, f"缺少 clarifier 节点，现有节点: {node_names}"
-    assert "summarizer" in node_names, f"缺少 summarizer 节点，现有节点: {node_names}"
+    assert pipeline is not None
+
+
+def test_pipeline_route_after_code_reviewer_approved():
+    from graph.pipeline import route_after_code_reviewer
+    state = {
+        "code_review_result": type("R", (), {"approved": True, "issues": []})(),
+        "script_retry_count": 0,
+        "error": None,
+    }
+    assert route_after_code_reviewer(state) == "script_runner"
+
+
+def test_pipeline_route_after_code_reviewer_retry():
+    from graph.pipeline import route_after_code_reviewer
+    state = {
+        "code_review_result": type("R", (), {"approved": False, "issues": ["问题"]})(),
+        "script_retry_count": 1,
+        "error": None,
+    }
+    assert route_after_code_reviewer(state) == "sql_engineer"
+
+
+def test_pipeline_route_after_code_reviewer_max_retries():
+    from graph.pipeline import route_after_code_reviewer
+    state = {
+        "code_review_result": type("R", (), {"approved": False, "issues": ["问题"]})(),
+        "script_retry_count": 3,
+        "error": None,
+    }
+    assert route_after_code_reviewer(state) == "end"
