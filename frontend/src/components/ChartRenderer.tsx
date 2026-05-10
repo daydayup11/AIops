@@ -2,6 +2,7 @@ import ReactECharts from "echarts-for-react";
 
 interface Props {
   render: "echarts" | "html" | "table" | "text";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   insight?: string;
 }

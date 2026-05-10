@@ -3,6 +3,7 @@ export type RenderType = "echarts" | "html" | "table" | "text";
 
 export interface WSMessage {
   type: MessageType;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   render?: RenderType;
   elapsed?: number;
@@ -11,6 +12,7 @@ export interface WSMessage {
 export interface ChatMessage {
   id: string;
   type: MessageType;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   render?: RenderType;
   timestamp: number;
