@@ -1,0 +1,134 @@
+<h2>科技风 vs 简明风 — 选择你偏好的整体方向</h2>
+<p class="subtitle">两种风格将支持切换，现在先确定科技风的视觉调性</p>
+
+<div class="cards" style="gap: 24px; margin-top: 24px;">
+
+  <!-- Option A: 深色科技风 -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)" style="flex: 1;">
+    <div class="card-image" style="background: #0a0e1a; padding: 16px; border-radius: 8px 8px 0 0; min-height: 280px;">
+      <!-- Header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color: #00d4ff; font-size: 14px;">⚡</span>
+          <span style="color: #00d4ff; font-size: 12px; font-weight: 600; letter-spacing: 2px;">校园网流量分析</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <div style="width:28px; height:20px; background:#0d1f3a; border:1px solid #1e3a5f; border-radius:4px;"></div>
+          <div style="width:28px; height:20px; background:#0d1f3a; border:1px solid #1e3a5f; border-radius:4px;"></div>
+        </div>
+      </div>
+      <!-- Layout -->
+      <div style="display:flex; gap:10px; height:220px;">
+        <!-- Sidebar -->
+        <div style="width:120px; background:#0d1422; border:1px solid #1e3a5f; border-radius:6px; padding:8px;">
+          <div style="background:#0a2040; border:1px solid #00d4ff44; border-left:2px solid #00d4ff; border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+            <div style="color:#00d4ff; font-size:10px;">今天 14:30</div>
+            <div style="color:#c0e0ff; font-size:9px; margin-top:2px;">分析出口流量...</div>
+          </div>
+          <div style="background:#0d1a2e; border:1px solid #1e3a5f; border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+            <div style="color:#4a7fa5; font-size:10px;">昨天 09:12</div>
+            <div style="color:#4a7fa5; font-size:9px; margin-top:2px;">查看用户数据...</div>
+          </div>
+          <div style="background:#0d1a2e; border:1px solid #1e3a5f; border-radius:4px; padding:6px 8px;">
+            <div style="color:#4a7fa5; font-size:10px;">5月8日</div>
+            <div style="color:#4a7fa5; font-size:9px; margin-top:2px;">流量异常检测</div>
+          </div>
+        </div>
+        <!-- Main area -->
+        <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+          <!-- Chart card -->
+          <div style="flex:1; background:#0d1422; border:1px solid #1e3a5f; border-radius:6px; padding:10px; position:relative; overflow:hidden;">
+            <div style="position:absolute; top:0; left:0; right:0; bottom:0; background: radial-gradient(circle at 80% 50%, #00d4ff08, transparent 60%);"></div>
+            <div style="color:#7eb8d4; font-size:9px; letter-spacing:1px; margin-bottom:8px;">TRAFFIC ANALYSIS</div>
+            <!-- Fake chart bars -->
+            <div style="display:flex; align-items:flex-end; gap:4px; height:80px; padding:0 4px;">
+              <div style="flex:1; background: linear-gradient(to top, #00d4ff, #0088cc44); height:60%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00d4ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00d4ff, #0088cc44); height:80%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00d4ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00d4ff, #0088cc44); height:45%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00d4ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00d4ff, #0088cc44); height:90%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00d4ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00d4ff, #0088cc44); height:70%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00d4ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00a8ff, #0066cc44); height:55%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00a8ff44;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #00a8ff, #0066cc44); height:65%; border-radius:2px 2px 0 0; box-shadow: 0 0 6px #00a8ff44;"></div>
+            </div>
+            <div style="height:1px; background: linear-gradient(to right, transparent, #1e3a5f, transparent); margin-top:4px;"></div>
+          </div>
+          <!-- Input -->
+          <div style="background:#0d1422; border:1px solid #1e3a5f; border-radius:6px; padding:8px; display:flex; gap:8px; align-items:center;">
+            <div style="flex:1; background:#0a0e1a; border:1px solid #1e3a5f; border-radius:4px; padding:5px 8px;">
+              <span style="color:#2a5f85; font-size:9px;">输入分析问题...</span>
+            </div>
+            <div style="width:24px; height:24px; background: linear-gradient(135deg, #00d4ff, #0066ff); border-radius:4px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 8px #00d4ff44;">
+              <span style="color:#000; font-size:10px;">→</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 深色科技风（Tech Dark）</h3>
+      <p>深海蓝黑背景，青蓝色霓虹高亮，发光图表效果。视觉冲击强，适合数据大屏展示场景。</p>
+    </div>
+  </div>
+
+  <!-- Option B: 深色渐变科技风 -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)" style="flex: 1;">
+    <div class="card-image" style="background: #0f0f1a; padding: 16px; border-radius: 8px 8px 0 0; min-height: 280px;">
+      <!-- Header -->
+      <div style="display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid rgba(99,102,241,0.3); padding-bottom: 10px; margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color: #818cf8; font-size: 14px;">⚡</span>
+          <span style="color: #e2e8f0; font-size: 12px; font-weight: 600; letter-spacing: 1px;">校园网流量分析</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <div style="width:28px; height:20px; background:#1e1e3a; border:1px solid rgba(99,102,241,0.3); border-radius:4px;"></div>
+          <div style="width:28px; height:20px; background:#1e1e3a; border:1px solid rgba(99,102,241,0.3); border-radius:4px;"></div>
+        </div>
+      </div>
+      <!-- Layout -->
+      <div style="display:flex; gap:10px; height:220px;">
+        <div style="width:120px; background:#161626; border:1px solid rgba(99,102,241,0.2); border-radius:6px; padding:8px;">
+          <div style="background: linear-gradient(135deg, #312e81, #1e1e3a); border:1px solid rgba(99,102,241,0.5); border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+            <div style="color:#a5b4fc; font-size:10px;">今天 14:30</div>
+            <div style="color:#c7d2fe; font-size:9px; margin-top:2px;">分析出口流量...</div>
+          </div>
+          <div style="background:#1a1a30; border:1px solid rgba(99,102,241,0.15); border-radius:4px; padding:6px 8px; margin-bottom:6px;">
+            <div style="color:#4a4a8a; font-size:10px;">昨天 09:12</div>
+            <div style="color:#4a4a8a; font-size:9px; margin-top:2px;">查看用户数据...</div>
+          </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+          <div style="flex:1; background:#161626; border:1px solid rgba(99,102,241,0.2); border-radius:6px; padding:10px; position:relative; overflow:hidden;">
+            <div style="position:absolute; top:-20px; right:-20px; width:100px; height:100px; background:radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%);"></div>
+            <div style="color:#6366f1; font-size:9px; letter-spacing:1px; margin-bottom:8px;">TRAFFIC ANALYSIS</div>
+            <div style="display:flex; align-items:flex-end; gap:4px; height:80px; padding:0 4px;">
+              <div style="flex:1; background: linear-gradient(to top, #818cf8, #312e8144); height:60%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #818cf8, #312e8144); height:80%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #818cf8, #312e8144); height:45%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #a78bfa, #4c1d9544); height:90%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #a78bfa, #4c1d9544); height:70%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #818cf8, #312e8144); height:55%; border-radius:2px 2px 0 0;"></div>
+              <div style="flex:1; background: linear-gradient(to top, #818cf8, #312e8144); height:65%; border-radius:2px 2px 0 0;"></div>
+            </div>
+          </div>
+          <div style="background:#161626; border:1px solid rgba(99,102,241,0.2); border-radius:6px; padding:8px; display:flex; gap:8px; align-items:center;">
+            <div style="flex:1; background:#0f0f1a; border:1px solid rgba(99,102,241,0.2); border-radius:4px; padding:5px 8px;">
+              <span style="color:#4a4a8a; font-size:9px;">输入分析问题...</span>
+            </div>
+            <div style="width:24px; height:24px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+              <span style="color:#fff; font-size:10px;">→</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 极光紫科技风（Aurora Dark）</h3>
+      <p>深紫黑背景，靛蓝/紫罗兰高亮，渐变光晕效果。氛围感强，科技感与优雅兼顾。</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top: 20px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 16px;">
+  <p style="font-size: 13px; color: #888; margin: 0;">两种风格都将支持与现有简明白色风格（Clean Light）切换。点击选择你偏好的科技风调性，或在终端告诉我你的想法。</p>
+</div>
