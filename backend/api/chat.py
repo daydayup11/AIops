@@ -3,7 +3,8 @@ import json
 import logging
 from functools import partial
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from db.sqlite import create_session, save_message
+from langchain_openai import ChatOpenAI
+from db.sqlite import create_session, save_message, rename_session
 from graph.pipeline import build_pipeline, PipelineState
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,34 @@ def get_pipeline():
 
 async def _send(ws: WebSocket, payload: dict) -> None:
     await ws.send_text(json.dumps(payload, ensure_ascii=False))
+
+
+def _get_llm() -> ChatOpenAI:
+    from config import settings
+    return ChatOpenAI(
+        base_url=settings["llm"]["base_url"],
+        api_key=settings["llm"]["api_key"],
+        model=settings["llm"]["model"],
+        max_tokens=20,
+        temperature=0.0,
+    )
+
+
+async def generate_and_push_title(session_id: str, user_message: str, send_fn) -> None:
+    try:
+        llm = _get_llm()
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: llm.invoke([
+                {"role": "system", "content": "用不超过10个字概括这个问题，只输出标题，不加标点"},
+                {"role": "user", "content": user_message[:200]},
+            ]),
+        )
+        title = result.content.strip()[:20]  # guard against overlong response
+        rename_session(session_id, title)
+        await send_fn({"type": "session_title", "session_id": session_id, "title": title})
+    except Exception:
+        logger.debug("LLM naming failed silently for session %s", session_id, exc_info=True)
 
 
 @router.websocket("/chat")
@@ -122,6 +151,9 @@ async def websocket_chat(ws: WebSocket):
                 logger.info("[%s] summary sent  points=%d", session_id, len(report.key_points))
 
             logger.info("[%s] pipeline done  outputs=%d", session_id, len(result_state["viz_outputs"]))
+            asyncio.ensure_future(
+                generate_and_push_title(session_id, message, lambda p: _send(ws, p))
+            )
             await _send(ws, {"type": "done", "content": "分析完成"})
 
     except WebSocketDisconnect:
